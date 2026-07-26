@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="SafeAct — the safety checkpoint every AI action passes through before it happens. Checked, held when unsure, exactly-once, provable.">
+<title>SafeAct — the safety checkpoint for AI actions</title>
+<style>
+  :root {
+    --bg: #F3F5F2;
+    --surface: #FFFFFF;
+    --surface-2: #FAFBF9;
+    --ink: #13181A;
+    --muted: #59635D;
+    --faint: #8A938C;
+    --line: #DDE3DD;
+    --line-strong: #C7CFC8;
+    --accent: #0F7A45;        /* cleared / go */
+    --accent-bright: #14A25B;
+    --accent-wash: #E5F1E9;
+    --amber: #A5620A;         /* held for review */
+    --amber-wash: #F6ECDC;
+    --seal: #3B4A63;          /* sealed / proof */
+    --seal-wash: #E7EAF1;
+    --shadow: 0 1px 2px rgba(19,24,26,.04), 0 8px 28px rgba(19,24,26,.06);
+    --radius: 12px;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D1112;
+      --surface: #151B1C;
+      --surface-2: #101617;
+      --ink: #E9EEEA;
+      --muted: #98A29B;
+      --faint: #6C766F;
+      --line: #232D2D;
+      --line-strong: #303B3A;
+      --accent: #35C26B;
+      --accent-bright: #52D585;
+      --accent-wash: #12241A;
+      --amber: #F0A93A;
+      --amber-wash: #241C10;
+      --seal: #98A9CC;
+      --seal-wash: #191E2A;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 34px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F3F5F2; --surface: #FFFFFF; --surface-2: #FAFBF9; --ink: #13181A;
+    --muted: #59635D; --faint: #8A938C; --line: #DDE3DD; --line-strong: #C7CFC8;
+    --accent: #0F7A45; --accent-bright: #14A25B; --accent-wash: #E5F1E9;
+    --amber: #A5620A; --amber-wash: #F6ECDC; --seal: #3B4A63; --seal-wash: #E7EAF1;
+    --shadow: 0 1px 2px rgba(19,24,26,.04), 0 8px 28px rgba(19,24,26,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1112; --surface: #151B1C; --surface-2: #101617; --ink: #E9EEEA;
+    --muted: #98A29B; --faint: #6C766F; --line: #232D2D; --line-strong: #303B3A;
+    --accent: #35C26B; --accent-bright: #52D585; --accent-wash: #12241A;
+    --amber: #F0A93A; --amber-wash: #241C10; --seal: #98A9CC; --seal-wash: #191E2A;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 34px rgba(0,0,0,.4);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; }
+
+  /* ---- shared bits ---- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+  }
+  .pill {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    letter-spacing: .06em; padding: 3px 8px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .pill--go   { color: var(--accent); background: var(--accent-wash); }
+  .pill--hold { color: var(--amber);  background: var(--amber-wash); }
+  .pill--seal { color: var(--seal);   background: var(--seal-wash); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    font-family: var(--sans); font-size: 15px; font-weight: 600;
+    padding: 11px 20px; border-radius: 9px; text-decoration: none;
+    border: 1px solid transparent; transition: transform .12s ease, background .12s ease, border-color .12s ease;
+  }
+  .btn--primary { background: var(--accent); color: #fff; }
+  :root[data-theme="dark"] .btn--primary { color: #06120B; }
+  @media (prefers-color-scheme: dark) { .btn--primary { color: #06120B; } }
+  .btn--primary:hover { background: var(--accent-bright); transform: translateY(-1px); }
+  .btn--ghost { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+  .btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+
+  /* ---- top bar ---- */
+  header.nav {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-in { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+  .mark {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    border: 1.5px solid var(--accent); position: relative;
+    display: grid; place-items: center;
+  }
+  .mark::after {
+    content: ""; width: 9px; height: 5px; border-left: 2px solid var(--accent);
+    border-bottom: 2px solid var(--accent); transform: rotate(-45deg) translate(1px,-1px);
+  }
+  .nav-cta { display: flex; align-items: center; gap: 14px; }
+  .nav-link { font-size: 14px; color: var(--muted); text-decoration: none; }
+  .nav-link:hover { color: var(--ink); }
+
+  /* ---- hero ---- */
+  .hero { padding: 68px 0 40px; }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 52px; align-items: center; }
+  h1 {
+    font-family: var(--sans); font-weight: 760; font-size: clamp(34px, 5vw, 52px);
+    line-height: 1.05; letter-spacing: -.025em; margin: 16px 0 0; text-wrap: balance;
+  }
+  h1 .lede-accent { color: var(--accent); }
+  .sub { font-size: 18.5px; color: var(--muted); margin: 20px 0 0; max-width: 34ch; text-wrap: pretty; }
+  .sub strong { color: var(--ink); font-weight: 650; }
+  .hero-actions { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+  .install {
+    margin-top: 22px; font-family: var(--mono); font-size: 13.5px; color: var(--muted);
+    display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  .install code { color: var(--ink); }
+  .install .tick { color: var(--accent); }
+
+  /* ---- ledger (hero right) ---- */
+  .ledger {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden; font-family: var(--mono);
+  }
+  .ledger-top {
+    display: flex; align-items: center; gap: 8px; padding: 11px 14px;
+    border-bottom: 1px solid var(--line); background: var(--surface-2);
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+  .ledger-title { margin-left: 6px; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+  .ledger-live { margin-left: auto; font-size: 10.5px; letter-spacing: .1em; color: var(--accent); display: flex; align-items: center; gap: 6px; }
+  .beacon { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bright); box-shadow: 0 0 0 0 var(--accent-bright); animation: beacon 2.4s ease-out infinite; }
+  @keyframes beacon { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-bright) 55%, transparent); } 70%,100% { box-shadow: 0 0 0 7px transparent; } }
+  .row {
+    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
+    padding: 14px; border-bottom: 1px solid var(--line);
+    opacity: 0; transform: translateY(6px); animation: rowin .5s ease forwards;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row:nth-child(2) { animation-delay: .15s; }
+  .row:nth-child(3) { animation-delay: .5s; }
+  .row:nth-child(4) { animation-delay: .95s; }
+  .row:nth-child(5) { animation-delay: 1.35s; }
+  @keyframes rowin { to { opacity: 1; transform: none; } }
+  .row-key { font-size: 13px; color: var(--ink); }
+  .row-meta { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .row { opacity: 1; transform: none; animation: none; }
+    .beacon { animation: none; }
+  }
+
+  /* ---- section frame ---- */
+  section { padding: 62px 0; border-top: 1px solid var(--line); }
+  .sec-head { max-width: 60ch; }
+  h2 { font-size: clamp(24px, 3.4vw, 32px); line-height: 1.12; letter-spacing: -.02em; margin: 12px 0 0; font-weight: 720; text-wrap: balance; }
+  .sec-head p { color: var(--muted); font-size: 17px; margin: 12px 0 0; }
+
+  /* problem stat band */
+  .stat-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-top: 34px; }
+  .stat { background: var(--surface); padding: 26px 24px; }
+  .stat .n { font-family: var(--mono); font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat .n.warn { color: var(--amber); }
+  .stat .n.good { color: var(--accent); }
+  .stat .l { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+  /* guarantees */
+  .grid4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 34px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+  .card .g-label { display: flex; align-items: center; gap: 10px; }
+  .g-ico { font-family: var(--mono); font-weight: 700; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; flex: none; }
+  .g-ico.check { color: var(--accent); background: var(--accent-wash); }
+  .g-ico.hold  { color: var(--amber);  background: var(--amber-wash); }
+  .g-ico.once  { color: var(--accent); background: var(--accent-wash); }
+  .g-ico.proof { color: var(--seal);   background: var(--seal-wash); }
+  .card h3 { margin: 0; font-size: 17px; font-weight: 680; letter-spacing: -.01em; }
+  .card p { margin: 12px 0 0; color: var(--muted); font-size: 14.5px; }
+
+  /* demo */
+  .demo-steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-top: 32px; }
+  .step { background: var(--surface); padding: 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .step-n { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .1em; }
+  .step p { margin: 0; font-size: 13.5px; color: var(--ink); }
+  .step .pill { align-self: flex-start; }
+
+  /* pricing / open core */
+  .tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 34px; }
+  .tier { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; display: flex; flex-direction: column; }
+  .tier.control { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); box-shadow: var(--shadow); }
+  .tier .t-name { font-family: var(--mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .tier .t-price { font-size: 22px; font-weight: 720; margin: 8px 0 2px; letter-spacing: -.01em; }
+  .tier .t-price span { font-size: 14px; color: var(--muted); font-weight: 500; }
+  .tier ul { list-style: none; margin: 18px 0 24px; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+  .tier li { font-size: 14.5px; color: var(--muted); padding-left: 24px; position: relative; }
+  .tier li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 8px; height: 4px; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg); }
+  .tier .btn { margin-top: auto; justify-content: center; }
+
+  /* closing */
+  .cta-final { text-align: center; }
+  .cta-final .btn { margin-top: 26px; }
+  footer { border-top: 1px solid var(--line); padding: 34px 0 60px; color: var(--faint); font-size: 13px; }
+  .foot-in { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; }
+  .foot-in .brand { font-size: 15px; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 36px; }
+    .sub { max-width: none; }
+    .stat-band { grid-template-columns: 1fr; }
+    .grid4 { grid-template-columns: 1fr; }
+    .demo-steps { grid-template-columns: 1fr; }
+    .tiers { grid-template-columns: 1fr; }
+    .nav-link { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <div class="brand"><span class="mark" aria-hidden="true"></span> SafeAct</div>
+    <nav class="nav-cta">
+      <a class="nav-link" href="#how">How it works</a>
+      <a class="nav-link" href="#pricing">Pricing</a>
+      <a class="btn btn--primary" href="https://github.com/tarunagarwal1981/safeact">Get started free</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero" style="border-top:0;">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">The control plane for AI actions</span>
+        <h1>The safety checkpoint every AI action passes through — <span class="lede-accent">before it happens.</span></h1>
+        <p class="sub">Your agent can send the email, issue the refund, update the record. SafeAct makes sure it does that <strong>safely, once, and on the record</strong> — so your risk team says yes instead of no.</p>
+        <div class="hero-actions">
+          <a class="btn btn--primary" href="https://github.com/tarunagarwal1981/safeact">Get started free</a>
+          <a class="btn btn--ghost" href="#demo">Watch the 90-sec demo</a>
+        </div>
+        <div class="install">
+          <span><span class="tick">$</span> <code>pip install safeact</code></span>
+          <span><span class="tick">$</span> <code>npm i safeact</code></span>
+        </div>
+      </div>
+
+      <aside class="ledger" aria-label="Example SafeAct action ledger">
+        <div class="ledger-top">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="ledger-title">action ledger</span>
+          <span class="ledger-live"><span class="beacon"></span> LIVE</span>
+        </div>
+        <div class="row">
+          <div><div class="row-key">refund · <b>$50.00</b> → a@acme.com</div><div class="row-meta">confidence 0.98 · rule: refund_policy v4</div></div>
+          <span class="pill pill--go">✓ CLEARED</span>
+        </div>
+        <div class="row">
+          <div><div class="row-key">refund · <b>$50,000.00</b> → k@northwind.com</div><div class="row-meta">confidence 0.71 · below floor 0.90</div></div>
+          <span class="pill pill--hold">✋ HELD</span>
+        </div>
+        <div class="row">
+          <div><div class="row-key">send_email · receipt #8842</div><div class="row-meta">retried 3× after crash</div></div>
+          <span class="pill pill--go">① RAN ONCE</span>
+        </div>
+        <div class="row">
+          <div><div class="row-key">update_record · claim CLM-2231</div><div class="row-meta">approved by dana@ · 14:02:11Z</div></div>
+          <span class="pill pill--seal">🔒 SEALED</span>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="problem">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">The problem nobody wants to admit</span>
+        <h2>The agent isn't too dumb to deploy. It's too untrusted to let act.</h2>
+        <p>Almost every company launched an AI agent this year. Almost none put one into production — not for lack of intelligence, but because no one could trust it to touch real money and real customers.</p>
+      </div>
+      <div class="stat-band">
+        <div class="stat"><div class="n">97%</div><div class="l">of companies launched an AI agent this year</div></div>
+        <div class="stat"><div class="n warn">12%</div><div class="l">reached production at scale</div></div>
+        <div class="stat"><div class="n good">4 / 5</div><div class="l">of SafeAct's guarantees are already running in production code</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">What SafeAct does</span>
+        <h2>Four things, every single time your agent acts.</h2>
+        <p>Enforced in code — underneath any agent framework. The model proposes; SafeAct decides whether the action is allowed to happen.</p>
+      </div>
+      <div class="grid4">
+        <div class="card">
+          <div class="g-label"><span class="g-ico check" aria-hidden="true">✓</span><h3>Checked</h3></div>
+          <p>Every action is checked against your rules — in code, not a prompt the model can talk its way around.</p>
+        </div>
+        <div class="card">
+          <div class="g-label"><span class="g-ico hold" aria-hidden="true">✋</span><h3>Held when unsure</h3></div>
+          <p>Low-confidence actions are routed to a human to approve or reject — not fired off blindly and cleaned up later.</p>
+        </div>
+        <div class="card">
+          <div class="g-label"><span class="g-ico once" aria-hidden="true">①</span><h3>Exactly once</h3></div>
+          <p>Crash, restart, retry — the refund still goes out once. And if it's genuinely unknowable, SafeAct says so instead of guessing.</p>
+        </div>
+        <div class="card">
+          <div class="g-label"><span class="g-ico proof" aria-hidden="true">🔒</span><h3>Provable</h3></div>
+          <p>A tamper-evident receipt for every action: what happened, why, which rule was in force, and who approved it.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">See it in 90 seconds</span>
+        <h2>One refund agent. Five moments. The whole thesis.</h2>
+        <p>Nothing staged — this is the product doing its job, start to finish.</p>
+      </div>
+      <div class="demo-steps">
+        <div class="step"><span class="step-n">01</span><p>Agent issues a routine <b>$50</b> refund.</p><span class="pill pill--go">✓ CLEARED</span></div>
+        <div class="step"><span class="step-n">02</span><p>Agent tries a <b>$50,000</b> refund.</p><span class="pill pill--hold">✋ HELD</span></div>
+        <div class="step"><span class="step-n">03</span><p>A human clicks approve. It runs.</p><span class="pill pill--go">✓ RAN</span></div>
+        <div class="step"><span class="step-n">04</span><p>Server dies mid-payment, restarts.</p><span class="pill pill--go">① NO DOUBLE</span></div>
+        <div class="step"><span class="step-n">05</span><p>One button: <b>"Prove it."</b></p><span class="pill pill--seal">🔒 RECEIPT</span></div>
+      </div>
+      <div class="hero-actions" style="margin-top:28px;">
+        <a class="btn btn--primary" href="#start">Watch the demo</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">How it's built to spread</span>
+        <h2>Free core. Paid control.</h2>
+        <p>Two free libraries get developers in the door — the action spine and the verifier. The control plane is what their risk and compliance leads pay to keep.</p>
+      </div>
+      <div class="tiers">
+        <div class="tier">
+          <span class="t-name">SafeAct Core</span>
+          <div class="t-price">Free <span>· open source</span></div>
+          <ul>
+            <li>Exactly-once, crash-safe execution</li>
+            <li>Honest "in-doubt" state — never a blind retry</li>
+            <li>Saga rollback for multi-step actions</li>
+            <li>Python &amp; TypeScript, ten lines to adopt</li>
+            <li>Runs local — one file, no server</li>
+            <li>Ships with <b>wobbly</b> — label-free checks that flag unstable AI outputs before you act on them</li>
+          </ul>
+          <a class="btn btn--ghost" href="https://github.com/tarunagarwal1981/safeact">Install the library</a>
+        </div>
+        <div class="tier control">
+          <span class="t-name">SafeAct Control</span>
+          <div class="t-price">Talk to us <span>· for teams that answer to someone</span></div>
+          <ul>
+            <li>Human-approval inbox for held actions</li>
+            <li>Rules-as-code policy engine, versioned</li>
+            <li>Tamper-evident audit of every action</li>
+            <li>One-click "prove it" regulator export</li>
+            <li>Roles, multi-team, SSO</li>
+          </ul>
+          <a class="btn btn--primary" href="#start">Book a demo</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="start">
+    <div class="wrap cta-final">
+      <span class="eyebrow">Built by people who've shipped this</span>
+      <h2>Let your AI act. Keep the proof.</h2>
+      <p class="sub" style="margin:14px auto 0; max-width:52ch;">SafeAct comes out of running real, action-taking agents in production — where we learned exactly how they break. That knowledge is the product.</p>
+      <a class="btn btn--primary" href="https://github.com/tarunagarwal1981/safeact">Get started free</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-in">
+    <div class="brand"><span class="mark" aria-hidden="true"></span> SafeAct</div>
+    <div>safeact.ai · The control plane for AI actions · Powered by the open-source safeact + wobbly cores</div>
+  </div>
+</footer>
+</body>
+</html>
