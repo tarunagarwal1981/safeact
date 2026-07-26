@@ -318,7 +318,7 @@
         </div>
         <div class="card">
           <div class="g-label"><span class="g-ico hold" aria-hidden="true">✋</span><h3>Held when unsure</h3></div>
-          <p>Low-confidence actions are routed to a human to approve or reject — not fired off blindly and cleaned up later.</p>
+          <p>Low-confidence actions are routed to a human to approve or reject — not fired off blindly. The confidence signal comes from real checks (our companion library <b>wobbly</b>), not the model grading its own homework.</p>
         </div>
         <div class="card">
           <div class="g-label"><span class="g-ico once" aria-hidden="true">①</span><h3>Exactly once</h3></div>
@@ -361,8 +361,8 @@
       </div>
       <div class="tiers">
         <div class="tier">
-          <span class="t-name">SafeAct Core</span>
-          <div class="t-price">Free <span>· open source</span></div>
+          <span class="t-name">SafeAct Core + wobbly</span>
+          <div class="t-price">Free <span>· two open-source libraries</span></div>
           <ul>
             <li>Exactly-once, crash-safe execution</li>
             <li>Honest "in-doubt" state — never a blind retry</li>
