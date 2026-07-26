@@ -1,0 +1,30 @@
+{
+  "name": "safeact",
+  "version": "0.0.1",
+  "description": "SafeAct — the safety checkpoint for AI actions. TypeScript SDK (in progress).",
+  "license": "MIT",
+  "author": "Tarun Agarwal",
+  "homepage": "https://safeact.ai",
+  "keywords": [
+    "ai",
+    "agents",
+    "idempotency",
+    "exactly-once",
+    "durable-execution",
+    "saga",
+    "reliability",
+    "llm",
+    "hitl"
+  ],
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
