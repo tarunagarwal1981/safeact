@@ -20,19 +20,25 @@ Every action an agent takes passes four guarantees:
 
 ## Repository layout
 
-This is a monorepo. It grows package-by-package as the product does.
+This is the **public, open-source** repo. It holds only the free libraries and the
+marketing site. **The paid platform lives in a separate private repo** (see below).
 
 ```
-safeact/
+safeact/  (PUBLIC · Apache-2.0)
 ├── BRIEF.md              Product brief — problem, architecture, v1 scope, launch plan
-├── packages/
-│   └── core-py/          SafeAct Core (Python) — exactly-once · in-doubt · saga rollback
-│                         The free, open-source correctness engine. BUILT + tested.
-└── (planned)
-    ├── packages/core-ts/         SafeAct Core (TypeScript) — thin SDK
-    ├── services/control/         SafeAct Control — policy engine, approval inbox, audit, export
-    └── apps/web/                 Marketing site + Control console
+├── docs/                 Marketing site (served via GitHub Pages)
+└── packages/
+    ├── core-py/          SafeAct Core (Python) — exactly-once · in-doubt · saga. BUILT + tested.
+    └── core-ts/          SafeAct Core (TypeScript SDK) — thin client. Placeholder → in progress.
 ```
+
+### Where the paid code goes
+
+`SafeAct Control` — the commercial platform (policy engine, human-approval inbox,
+tamper-evident audit, "prove it" regulator export, billing, Control console UI) — lives in a
+**separate PRIVATE repo, `safeact-control`**. GitHub repos are all-or-nothing public/private,
+so commercial IP is never committed here. **Open-core rule: this repo is free; anything
+customers pay for stays private.**
 
 The two-half architecture (free correctness core + paid governance layer) is described in
 [BRIEF.md](BRIEF.md).
