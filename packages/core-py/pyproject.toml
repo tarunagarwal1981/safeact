@@ -1,0 +1,21 @@
+[project]
+name = "safeact"
+version = "0.0.1"
+description = "At-most-once side effects for AI agents that crash and retry. One decorator, one Saga, a SQLite file."
+requires-python = ">=3.11"
+dependencies = []  # standard library only — sqlite3 is stdlib
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["safeact"]
+
+[tool.pytest.ini_options]
+# put the project root on sys.path so `import safeact` resolves without an install
+pythonpath = ["."]
+testpaths = ["tests"]
