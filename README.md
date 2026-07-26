@@ -2,6 +2,8 @@
 
 **The safety checkpoint every AI action passes through — before it happens.**
 
+🌐 **Live site:** https://tarunagarwal1981.github.io/safeact/
+
 Your AI agent can send the email, issue the refund, update the record. SafeAct makes sure it
 does that **safely, once, and on the record** — so your risk team says yes instead of no.
 
@@ -67,4 +69,11 @@ the state machine and rationale.
 
 - **SafeAct Core (Python)** — built, mutation-tested, 15/15 green.
 - **SafeAct Control** — designed (see BRIEF.md §5), not yet built.
-- **Name / domain** — safeact.ai; package `safeact` on PyPI + npm.
+- **Landing page** — live on GitHub Pages: https://tarunagarwal1981.github.io/safeact/
+- **Name / domain** — safeact.ai (available; not yet purchased); package `safeact` on PyPI + npm.
+
+## Related
+
+- [**wobbly**](https://github.com/tarunagarwal1981/wobbly) — metamorphic testing for AI outputs;
+  finds wrong answers with no labels. The label-free verification signal that feeds SafeAct's
+  "held when unsure" gate. A second free front door into the same trust thesis.
