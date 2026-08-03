@@ -1,6 +1,6 @@
 [project]
 name = "safeact"
-version = "0.0.1"
+version = "0.0.2"
 description = "At-most-once side effects for AI agents that crash and retry. One decorator, one Saga, a SQLite file."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,7 +26,11 @@ dependencies = []  # standard library only — sqlite3 is stdlib
 test = ["pytest>=7"]
 
 [project.urls]
-Homepage = "https://safeact.ai"
+# safeact.ai is not live yet — point at the working GitHub Pages site so the PyPI
+# "Homepage" link is never dead. Switch to https://safeact.ai in a later release
+# once the domain resolves.
+Homepage = "https://tarunagarwal1981.github.io/safeact/"
+Repository = "https://github.com/tarunagarwal1981/safeact"
 
 [build-system]
 requires = ["setuptools>=68"]

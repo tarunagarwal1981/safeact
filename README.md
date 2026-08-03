@@ -48,9 +48,7 @@ The two-half architecture (free correctness core + paid governance layer) is des
 ## Quickstart — SafeAct Core (Python)
 
 ```bash
-cd packages/core-py
-python3.11 -m venv .venv && ./.venv/bin/pip install -e ".[test]"
-./.venv/bin/pytest -q          # the crash-simulation suite (15 tests)
+pip install safeact
 ```
 
 ```python
@@ -65,6 +63,14 @@ send_receipt("refund-8842", "a@b.com", 50)   # runs once
 send_receipt("refund-8842", "a@b.com", 50)   # returns stored result, no re-send
 ```
 
+**Run the crash-simulation test suite from source:**
+
+```bash
+cd packages/core-py
+python3.11 -m venv .venv && ./.venv/bin/pip install -e ".[test]"
+./.venv/bin/pytest -q          # 15 tests: idempotency · in-doubt · concurrency · saga
+```
+
 See [packages/core-py/README.md](packages/core-py/README.md) for the full API and the four
 mutation-tested guarantees, and [packages/core-py/DESIGN.md](packages/core-py/DESIGN.md) for
 the state machine and rationale.
@@ -73,10 +79,11 @@ the state machine and rationale.
 
 ## Status
 
-- **SafeAct Core (Python)** — built, mutation-tested, 15/15 green.
+- **SafeAct Core (Python)** — built, mutation-tested, 15/15 green. **Live on PyPI:** `pip install safeact`.
+- **SafeAct Core (TypeScript)** — thin SDK, in progress (placeholder).
 - **SafeAct Control** — designed (see BRIEF.md §5), not yet built.
 - **Landing page** — live on GitHub Pages: https://tarunagarwal1981.github.io/safeact/
-- **Name / domain** — safeact.ai (available; not yet purchased); package `safeact` on PyPI + npm.
+- **Domain** — safeact.ai not yet live; links currently point at GitHub Pages.
 
 ## Related
 
