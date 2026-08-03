@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeAct — crash-safe side effects for AI agents</title>
+<style>html,body{margin:0;padding:0}</style>
+</head>
+<body>
+<style>
+  :root {
+    --ground: #0A0D12;
+    --panel: #12161F;
+    --panel-2: #0E121A;
+    --hairline: #20262F;
+    --hairline-soft: #191E27;
+    --text: #E6E9EF;
+    --text-muted: #8A93A2;
+    --text-faint: #5C6470;
+    --accent: #7C86FF;
+    --accent-dim: #5560c9;
+
+    --st-attempting: #E0A63C;
+    --st-succeeded: #46C08D;
+    --st-failed: #E5585B;
+    --st-indoubt: #9AA0B4;
+
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+
+    --maxw: 1080px;
+    --radius: 10px;
+    --radius-sm: 6px;
+
+    color-scheme: dark;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ground: #F6F7F9;
+      --panel: #FFFFFF;
+      --panel-2: #FBFCFD;
+      --hairline: #E2E6EC;
+      --hairline-soft: #EDF0F4;
+      --text: #12161F;
+      --text-muted: #59626F;
+      --text-faint: #99A0AC;
+      --accent: #5560d6;
+      --accent-dim: #7C86FF;
+      --st-attempting: #B87914;
+      --st-succeeded: #1f9d67;
+      --st-failed: #cf3d40;
+      --st-indoubt: #6C7482;
+      color-scheme: light;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0A0D12; --panel: #12161F; --panel-2: #0E121A;
+    --hairline: #20262F; --hairline-soft: #191E27;
+    --text: #E6E9EF; --text-muted: #8A93A2; --text-faint: #5C6470;
+    --accent: #7C86FF; --accent-dim: #5560c9;
+    --st-attempting:#E0A63C; --st-succeeded:#46C08D; --st-failed:#E5585B; --st-indoubt:#9AA0B4;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --ground: #F6F7F9; --panel: #FFFFFF; --panel-2: #FBFCFD;
+    --hairline: #E2E6EC; --hairline-soft: #EDF0F4;
+    --text: #12161F; --text-muted: #59626F; --text-faint: #99A0AC;
+    --accent: #5560d6; --accent-dim: #7C86FF;
+    --st-attempting:#B87914; --st-succeeded:#1f9d67; --st-failed:#cf3d40; --st-indoubt:#6C7482;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  .wrap {
+    font-family: var(--font-sans);
+    background: var(--ground);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  .container { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* ---- background texture: faint ledger grid ---- */
+  .wrap {
+    background-image:
+      linear-gradient(var(--hairline-soft) 1px, transparent 1px);
+    background-size: 100% 3rem;
+    background-position: 0 -1px;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  .mono { font-family: var(--font-mono); }
+
+  /* ============ NAV ============ */
+  nav.bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px; max-width: var(--maxw); margin: 0 auto;
+    position: relative; z-index: 5;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-weight: 600; letter-spacing: -0.02em; }
+  .brand .mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    border: 1px solid var(--hairline);
+    background: var(--panel);
+    display: grid; place-items: center;
+    box-shadow: inset 0 0 0 1px rgba(124,134,255,0.10);
+  }
+  .brand .mark span { width: 9px; height: 9px; border-radius: 3px; background: var(--st-succeeded); box-shadow: 0 0 12px var(--st-succeeded); }
+  .nav-links { display: flex; gap: 22px; align-items: center; font-size: 13.5px; }
+  .nav-links a { color: var(--text-muted); }
+  .nav-links a:hover { color: var(--text); text-decoration: none; }
+  @media (max-width: 680px) { .nav-links a.hide-sm { display: none; } }
+
+  /* ============ HERO ============ */
+  .hero { padding: 64px 0 40px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--text-faint);
+    display: inline-flex; align-items: center; gap: 10px; margin-bottom: 22px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--hairline); }
+
+  h1.hero-h {
+    font-family: var(--font-mono);
+    font-size: clamp(38px, 7vw, 76px);
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+    font-weight: 600;
+    margin: 0 0 24px;
+    text-wrap: balance;
+  }
+  h1.hero-h .dim { color: var(--text-faint); }
+  h1.hero-h .send { color: var(--st-succeeded); }
+
+  .lede {
+    font-size: clamp(16px, 2.1vw, 20px);
+    color: var(--text-muted);
+    max-width: 60ch; margin: 0 0 32px;
+  }
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .btn {
+    font-family: var(--font-mono); font-size: 14px;
+    padding: 11px 18px; border-radius: var(--radius-sm);
+    border: 1px solid var(--hairline); background: var(--panel); color: var(--text);
+    cursor: pointer; transition: border-color .15s, transform .05s, background .15s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { border-color: var(--accent); text-decoration: none; }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0A0D12; font-weight: 600; }
+  .btn.primary:hover { background: var(--accent-dim); }
+  :root[data-theme="light"] .btn.primary, :root:not([data-theme]) .btn.primary { color: #fff; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme]) .btn.primary { color: #fff; } }
+
+  .install {
+    font-family: var(--font-mono); font-size: 13.5px; color: var(--text-muted);
+    display: inline-flex; align-items: center; gap: 10px;
+    border: 1px solid var(--hairline); background: var(--panel-2);
+    padding: 9px 14px; border-radius: var(--radius-sm);
+  }
+  .install .pfx { color: var(--text-faint); }
+  .install .cp { color: var(--st-succeeded); }
+
+  /* ============ SIM (twin counter) ============ */
+  .sim {
+    margin-top: 44px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .sim-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 18px; border-bottom: 1px solid var(--hairline);
+    background: var(--panel-2);
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted);
+    flex-wrap: wrap;
+  }
+  .sim-head .title { color: var(--text); letter-spacing: -0.01em; }
+  .sim-head .tag { color: var(--text-faint); }
+  .sim-controls { display: flex; gap: 8px; }
+  .sim-controls .btn { padding: 7px 13px; font-size: 12.5px; }
+
+  .twin { display: grid; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 640px) { .twin { grid-template-columns: 1fr; } }
+  .lane { padding: 22px 20px; }
+  .lane + .lane { border-left: 1px solid var(--hairline); }
+  @media (max-width: 640px) { .lane + .lane { border-left: none; border-top: 1px solid var(--hairline); } }
+
+  .lane-label {
+    font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text-faint); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dotm { width: 7px; height: 7px; border-radius: 50%; }
+  .dotm.bad { background: var(--st-failed); }
+  .dotm.good { background: var(--st-succeeded); }
+
+  .counter { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .counter .num {
+    font-family: var(--font-mono); font-size: 60px; font-weight: 600;
+    letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums;
+    transition: color .2s;
+  }
+  .counter .num.bad { color: var(--st-failed); }
+  .counter .num.good { color: var(--st-succeeded); }
+  .counter .unit { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); }
+  .counter-sub { font-size: 13px; color: var(--text-muted); min-height: 20px; }
+
+  .tape {
+    margin-top: 16px; font-family: var(--font-mono); font-size: 11.5px;
+    height: 132px; overflow: hidden; position: relative;
+    border-top: 1px dashed var(--hairline); padding-top: 10px;
+    color: var(--text-faint);
+  }
+  .tape .row { display: flex; gap: 8px; white-space: nowrap; opacity: 0; animation: tapein .25s ease forwards; }
+  .tape .row .k { color: var(--text-faint); }
+  .tape .row .exec { color: var(--st-succeeded); }
+  .tape .row .dupe { color: var(--st-attempting); }
+  .tape .row .send { color: var(--st-failed); }
+  @keyframes tapein { from { opacity: 0; transform: translateX(-4px); } to { opacity: .95; transform: none; } }
+
+  /* ============ SECTION scaffolding ============ */
+  section.block { padding: 72px 0; border-top: 1px solid var(--hairline-soft); }
+  .kicker {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 14px;
+  }
+  h2.sec {
+    font-family: var(--font-mono); font-size: clamp(26px, 4vw, 38px);
+    letter-spacing: -0.03em; font-weight: 600; margin: 0 0 16px; line-height: 1.05;
+    text-wrap: balance;
+  }
+  .sec-lede { color: var(--text-muted); max-width: 62ch; font-size: 16.5px; margin: 0 0 8px; }
+
+  /* ============ CODE before/after ============ */
+  .codepair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 34px; }
+  @media (max-width: 760px) { .codepair { grid-template-columns: 1fr; } }
+  .code {
+    border: 1px solid var(--hairline); border-radius: var(--radius);
+    background: var(--panel); overflow: hidden;
+  }
+  .code-head {
+    padding: 10px 16px; border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);
+    display: flex; align-items: center; justify-content: space-between; background: var(--panel-2);
+  }
+  .code-head .badge { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; padding: 3px 8px; border-radius: 20px; }
+  .badge.before { color: var(--st-failed); border: 1px solid color-mix(in srgb, var(--st-failed) 40%, transparent); }
+  .badge.after { color: var(--st-succeeded); border: 1px solid color-mix(in srgb, var(--st-succeeded) 40%, transparent); }
+  pre {
+    margin: 0; padding: 18px 16px; overflow-x: auto;
+    font-family: var(--font-mono); font-size: 12.8px; line-height: 1.7;
+    color: var(--text);
+  }
+  pre .c { color: var(--text-faint); }
+  pre .k { color: var(--accent); }
+  pre .s { color: var(--st-succeeded); }
+  pre .d { color: var(--st-attempting); }
+  pre .f { color: var(--st-failed); }
+  pre .m { color: var(--text-muted); }
+
+  /* ============ STEPPER (anatomy of one call) ============ */
+  .stepper { margin-top: 34px; border: 1px solid var(--hairline); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+  .track { display: flex; padding: 26px 20px 8px; gap: 0; }
+  @media (max-width:640px){ .track{ flex-direction: column; gap: 4px; } }
+  .node {
+    flex: 1; text-align: center; position: relative; padding: 0 6px;
+  }
+  .node .dot {
+    width: 44px; height: 44px; border-radius: 12px; margin: 0 auto 10px;
+    border: 1px solid var(--hairline); background: var(--panel-2);
+    display: grid; place-items: center; font-family: var(--font-mono); font-size: 15px;
+    color: var(--text-faint); transition: all .35s ease;
+  }
+  .node .nm { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; color: var(--text-faint); transition: color .3s; }
+  .node:not(:last-child)::after {
+    content: ""; position: absolute; top: 22px; left: calc(50% + 30px); right: calc(-50% + 30px);
+    height: 1px; background: var(--hairline);
+  }
+  @media (max-width:640px){ .node::after{ display: none; } }
+  .node.on .dot { border-color: var(--nodecol); color: var(--nodecol); box-shadow: 0 0 0 4px color-mix(in srgb, var(--nodecol) 15%, transparent); }
+  .node.on .nm { color: var(--nodecol); }
+  .node.attempting { --nodecol: var(--st-attempting); }
+  .node.succeeded { --nodecol: var(--st-succeeded); }
+  .node.indoubt { --nodecol: var(--st-indoubt); }
+  .node.failed { --nodecol: var(--st-failed); }
+
+  .step-log {
+    border-top: 1px solid var(--hairline); background: var(--panel-2);
+    padding: 16px 20px; font-family: var(--font-mono); font-size: 12.5px;
+    min-height: 190px;
+  }
+  .logline { display: flex; gap: 10px; padding: 3px 0; opacity: 0; animation: tapein .3s ease forwards; }
+  .logline .t { color: var(--text-faint); width: 92px; flex-shrink: 0; }
+  .logline .commit { color: var(--st-succeeded); }
+  .logline .exec { color: var(--accent); }
+  .logline .crash { color: var(--st-failed); }
+  .logline .doubt { color: var(--st-indoubt); }
+  .logline .miss { color: var(--st-failed); text-decoration: line-through; opacity: .8; }
+  .step-controls { display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--hairline); flex-wrap: wrap; }
+  .step-note { padding: 0 20px 20px; color: var(--text-muted); font-size: 14px; max-width: 66ch; }
+  .step-note code { font-family: var(--font-mono); color: var(--st-indoubt); background: color-mix(in srgb, var(--st-indoubt) 12%, transparent); padding: 1px 5px; border-radius: 4px; }
+
+  /* ============ SAGA ============ */
+  .saga { margin-top: 34px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 18px; }
+  @media (max-width: 780px){ .saga { grid-template-columns: 1fr; } }
+  .saga-steps { border: 1px solid var(--hairline); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+  .saga-steps .sh { padding: 12px 16px; border-bottom: 1px solid var(--hairline); font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); background: var(--panel-2); }
+  .sstep {
+    display: flex; align-items: center; gap: 14px; padding: 15px 16px;
+    border-bottom: 1px solid var(--hairline-soft); transition: background .3s;
+  }
+  .sstep:last-child { border-bottom: none; }
+  .sstep .idx { font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); width: 18px; }
+  .sstep .body { flex: 1; }
+  .sstep .nmn { font-family: var(--font-mono); font-size: 13.5px; }
+  .sstep .desc { font-size: 12px; color: var(--text-muted); }
+  .sstep .state {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 20px; border: 1px solid var(--hairline); color: var(--text-faint);
+    transition: all .3s; white-space: nowrap;
+  }
+  .sstep.done .state { color: var(--st-succeeded); border-color: color-mix(in srgb, var(--st-succeeded) 40%, transparent); }
+  .sstep.failed { background: color-mix(in srgb, var(--st-failed) 7%, transparent); }
+  .sstep.failed .state { color: var(--st-failed); border-color: color-mix(in srgb, var(--st-failed) 45%, transparent); }
+  .sstep.rolled .state { color: var(--st-indoubt); border-color: color-mix(in srgb, var(--st-indoubt) 40%, transparent); }
+  .sstep.rolled .nmn { color: var(--text-muted); }
+  .saga-log { border: 1px solid var(--hairline); border-radius: var(--radius); background: var(--panel-2); padding: 16px; font-family: var(--font-mono); font-size: 12px; min-height: 120px; }
+  .saga-log .l { padding: 2px 0; opacity: 0; animation: tapein .3s ease forwards; }
+  .saga-log .l.exec { color: var(--st-succeeded); }
+  .saga-log .l.fail { color: var(--st-failed); }
+  .saga-log .l.comp { color: var(--st-attempting); }
+  .saga-log .l.skip { color: var(--text-faint); }
+  .saga-controls { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* ============ GUARANTEES GRID ============ */
+  .grid4 { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; margin-top: 34px; }
+  @media (max-width: 700px){ .grid4 { grid-template-columns: 1fr; } }
+  .gcard { border: 1px solid var(--hairline); border-radius: var(--radius); background: var(--panel); padding: 22px; position: relative; overflow: hidden; }
+  .gcard .gi { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gc); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .gcard .gi::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--gc); }
+  .gcard h3 { font-family: var(--font-mono); font-size: 17px; letter-spacing: -0.02em; margin: 0 0 8px; font-weight: 600; }
+  .gcard p { margin: 0; color: var(--text-muted); font-size: 14px; }
+  .gcard.c1 { --gc: var(--st-succeeded); }
+  .gcard.c2 { --gc: var(--st-attempting); }
+  .gcard.c3 { --gc: var(--accent); }
+  .gcard.c4 { --gc: var(--st-indoubt); }
+  .gcard .proof { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+
+  /* ============ POSITIONING ============ */
+  .versus { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 30px; border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
+  @media (max-width:640px){ .versus { grid-template-columns: 1fr; } }
+  .vcol { padding: 26px 24px; }
+  .vcol.b { border-left: 1px solid var(--hairline); background: var(--panel); }
+  @media (max-width:640px){ .vcol.b { border-left: none; border-top: 1px solid var(--hairline); } }
+  .vcol .vh { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 10px; }
+  .vcol p { margin: 0; font-size: 15px; color: var(--text-muted); }
+  .vcol.b .vh { color: var(--st-succeeded); }
+  .vcol strong { color: var(--text); }
+
+  /* ============ FOOTER / API ============ */
+  .apiwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 30px; }
+  @media (max-width: 760px){ .apiwrap { grid-template-columns: 1fr; } }
+  footer.foot { border-top: 1px solid var(--hairline); padding: 40px 0 60px; margin-top: 20px; }
+  .foot-inner { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; color: var(--text-faint); font-family: var(--font-mono); font-size: 12.5px; }
+  .foot-inner a { color: var(--text-muted); }
+
+  .honest-callout {
+    margin-top: 20px; border: 1px solid color-mix(in srgb, var(--st-indoubt) 30%, var(--hairline));
+    border-left: 3px solid var(--st-indoubt);
+    background: color-mix(in srgb, var(--st-indoubt) 6%, transparent);
+    border-radius: var(--radius); padding: 18px 20px; font-size: 15px; color: var(--text-muted); max-width: 70ch;
+  }
+  .honest-callout strong { color: var(--text); font-family: var(--font-mono); font-size: 13.5px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+</style>
+
+<div class="wrap">
+
+  <nav class="bar">
+    <div class="brand"><span class="mark"><span></span></span>safeact</div>
+    <div class="nav-links">
+      <a href="#fix" class="hide-sm">The fix</a>
+      <a href="#anatomy" class="hide-sm">How</a>
+      <a href="#saga" class="hide-sm">Sagas</a>
+      <a href="#guarantees">Guarantees</a>
+    </div>
+  </nav>
+
+  <!-- ============ HERO ============ -->
+  <header class="hero">
+    <div class="container">
+      <div class="eyebrow">A crash-safe layer for AI agent tools</div>
+      <h1 class="hero-h">Crash. Retry.<br><span class="send">Send once.</span></h1>
+      <p class="lede">
+        When an agent dies mid-run and retries, it re-fires the actions that already happened —
+        <strong>the same email 40 times, the same card charged twice.</strong> Durable-execution engines persist an
+        agent's <em>state</em>. They don't make its <em>actions</em> safe. <strong>safeact</strong> is one Python
+        decorator that does — backed by a single SQLite file, no server.
+      </p>
+      <div class="cta-row">
+        <a href="#anatomy" class="btn primary">Watch it crash →</a>
+        <a href="#fix" class="btn">See the 10-line fix</a>
+      </div>
+      <div style="margin-top:8px">
+        <span class="install"><span class="pfx">$</span> pip install safeact <span class="cp">✓</span></span>
+      </div>
+
+      <!-- twin-counter simulator -->
+      <div class="sim" id="sim">
+        <div class="sim-head">
+          <span><span class="title">welcome_email(user=42)</span> &nbsp;<span class="tag">— same idempotency key, 40 retries after crashes</span></span>
+          <div class="sim-controls">
+            <button class="btn" id="simRun">▶ Run 40 retries</button>
+            <button class="btn" id="simReset">Reset</button>
+          </div>
+        </div>
+        <div class="twin">
+          <div class="lane">
+            <div class="lane-label"><span class="dotm bad"></span>Naïve tool — re-executes on every retry</div>
+            <div class="counter"><span class="num bad" id="naiveNum">0</span><span class="unit">emails sent</span></div>
+            <div class="counter-sub" id="naiveSub">idle</div>
+            <div class="tape" id="naiveTape"></div>
+          </div>
+          <div class="lane">
+            <div class="lane-label"><span class="dotm good"></span>@safe tool — idempotent by key</div>
+            <div class="counter"><span class="num good" id="safeNum">0</span><span class="unit">emails sent</span></div>
+            <div class="counter-sub" id="safeSub">idle</div>
+            <div class="tape" id="safeTape"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ THE FIX ============ -->
+  <section class="block" id="fix">
+    <div class="container">
+      <div class="kicker">The whole change</div>
+      <h2 class="sec">One decorator. A caller-supplied key. Done.</h2>
+      <p class="sec-lede">
+        The side effect stays exactly as you wrote it. You add <span class="mono">@safe</span> and pass a key that
+        names the <em>logical</em> action. Same key seen again → the stored result is returned instead of re-running.
+        This holds across process restarts, because the record lives in SQLite, not memory.
+      </p>
+
+      <div class="codepair">
+        <div class="code">
+          <div class="code-head"><span>refund_agent.py</span><span class="badge before">before — duplicates on retry</span></div>
+<pre><span class="k">def</span> send_receipt(to, amount):
+    <span class="c"># crash after this line, then</span>
+    <span class="c"># retry → a SECOND email goes out</span>
+    email.send(
+        to=to,
+        subject=<span class="s">"Your refund"</span>,
+        body=<span class="s">f"Refunded ${amount}."</span>,
+    )
+    <span class="k">return</span> {<span class="s">"sent"</span>: <span class="k">True</span>}
+</pre>
+        </div>
+        <div class="code">
+          <div class="code-head"><span>refund_agent.py</span><span class="badge after">after — at most once</span></div>
+<pre><span class="k">from</span> safeact <span class="k">import</span> safe
+
+<span class="d">@safe(store=</span><span class="s">"agent.db"</span><span class="d">)</span>
+<span class="k">def</span> send_receipt(key, to, amount):
+    email.send(
+        to=to,
+        subject=<span class="s">"Your refund"</span>,
+        body=<span class="s">f"Refunded ${amount}."</span>,
+    )
+    <span class="k">return</span> {<span class="s">"sent"</span>: <span class="k">True</span>}
+
+<span class="c"># key is the required first arg — impossible to forget</span>
+send_receipt(<span class="s">"refund-8842"</span>, to, amount)
+</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ANATOMY / STEPPER ============ -->
+  <section class="block" id="anatomy">
+    <div class="container">
+      <div class="kicker">Anatomy of one safe call</div>
+      <h2 class="sec">Record before execute — so a crash is loud, not silent.</h2>
+      <p class="sec-lede">
+        safeact commits <span class="mono">ATTEMPTING</span> to disk <em>before</em> the side effect runs. That committed
+        marker is what turns a would-be duplicate into a detectable event. Step through a call — then crash it in the gap
+        and watch it refuse to guess.
+      </p>
+
+      <div class="stepper">
+        <div class="track" id="track">
+          <div class="node" data-n="0"><div class="dot">◦</div><div class="nm">READY</div></div>
+          <div class="node" data-n="1"><div class="dot">1</div><div class="nm">ATTEMPTING</div></div>
+          <div class="node" data-n="2"><div class="dot">2</div><div class="nm">EXECUTED</div></div>
+          <div class="node" data-n="3"><div class="dot">3</div><div class="nm">SUCCEEDED</div></div>
+        </div>
+        <div class="step-log" id="stepLog"></div>
+        <div class="step-controls">
+          <button class="btn primary" id="runNormal">▶ Run normally</button>
+          <button class="btn" id="runCrash">💥 Crash in the gap</button>
+          <button class="btn" id="stepReset">Reset</button>
+          <span class="install" style="margin-left:auto"><span class="pfx">effects fired:</span> <span id="effectCount" style="color:var(--st-failed)">0</span></span>
+        </div>
+        <div class="step-note" id="stepNote">
+          Two paths. <strong style="color:var(--text)">Run normally</strong> reaches <span class="mono" style="color:var(--st-succeeded)">SUCCEEDED</span> and stores the result.
+          <strong style="color:var(--text)">Crash in the gap</strong> kills the process after the effect fired but before the outcome was recorded —
+          the one case we genuinely cannot resolve. The next call with that key raises <code>InDoubtError</code> instead of blindly retrying.
+        </div>
+      </div>
+
+      <div class="honest-callout">
+        <strong>The honest limitation.</strong> &nbsp;safeact does not pretend the gap between "effect ran" and "outcome recorded"
+        doesn't exist — it's inherent to talking to a system outside your transaction. A key stuck there is marked
+        <span class="mono" style="color:var(--st-indoubt)">in_doubt</span> and surfaced to a human, never silently re-run. An honest
+        in-doubt beats a confident duplicate.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SAGA ============ -->
+  <section class="block" id="saga">
+    <div class="container">
+      <div class="kicker">Compensation</div>
+      <h2 class="sec">When step 3 fails, steps 2 and 1 undo themselves — in reverse, once each.</h2>
+      <p class="sec-lede">
+        A <span class="mono">Saga</span> runs a sequence of <span class="mono">@safe</span> steps. If any step raises, it calls
+        the compensators of everything already completed, in reverse order. Each compensator is itself idempotent — so a
+        rollback that gets interrupted and replayed never double-refunds.
+      </p>
+
+      <div class="saga">
+        <div class="saga-steps">
+          <div class="sh">Saga("refund-8842") — charge → email → ledger</div>
+          <div class="sstep" id="ss0"><span class="idx">1</span><div class="body"><div class="nmn">charge_refund</div><div class="desc">↩ compensator: reverse_charge</div></div><span class="state">pending</span></div>
+          <div class="sstep" id="ss1"><span class="idx">2</span><div class="body"><div class="nmn">send_receipt</div><div class="desc">↩ compensator: send_correction</div></div><span class="state">pending</span></div>
+          <div class="sstep" id="ss2"><span class="idx">3</span><div class="body"><div class="nmn">write_ledger</div><div class="desc">✗ fails — ledger DB unreachable</div></div><span class="state">pending</span></div>
+        </div>
+        <div>
+          <div class="saga-log" id="sagaLog"><div class="l skip">Idle. Run the saga to watch it fail at step 3 and roll back.</div></div>
+          <div class="saga-controls">
+            <button class="btn primary" id="sagaRun">▶ Run saga (step 3 fails)</button>
+            <button class="btn" id="sagaReset">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GUARANTEES ============ -->
+  <section class="block" id="guarantees">
+    <div class="container">
+      <div class="kicker">Four guarantees — each proven by a crash-test, not a mock</div>
+      <h2 class="sec">If a guarantee can't be crash-tested, we don't claim it.</h2>
+      <p class="sec-lede">Every property below ships with a pytest that fails if you remove the property. The tests double as the spec.</p>
+
+      <div class="grid4">
+        <div class="gcard c1">
+          <div class="gi">Idempotency</div>
+          <h3>N retries, one execution</h3>
+          <p>A counter-backed tool called N times with the same key executes exactly once — across process restarts, because the record is on disk.</p>
+          <div class="proof">test: 40 retries → counter == 1</div>
+        </div>
+        <div class="gcard c2">
+          <div class="gi">Compensation</div>
+          <h3>Reverse-order undo, once each</h3>
+          <p>A failing Saga rolls back completed steps in reverse. Run the rollback twice and each compensator still fires exactly once.</p>
+          <div class="proof">test: 3-step saga, step 3 fails → 2,1 compensated once</div>
+        </div>
+        <div class="gcard c3">
+          <div class="gi">Durable record</div>
+          <h3>Written before it counts</h3>
+          <p>Every attempt is committed to SQLite before the side effect is considered done, so recovery reads truth, not a guess.</p>
+          <div class="proof">test: reopen DB after crash → state is on disk</div>
+        </div>
+        <div class="gcard c4">
+          <div class="gi">Honest in-doubt</div>
+          <h3>Refuses to guess</h3>
+          <p>Crash between execute and record → the key lands in <span class="mono">in_doubt</span> and the next call raises <span class="mono">InDoubtError</span>. No blind retry.</p>
+          <div class="proof">test: crash-in-gap → InDoubtError, counter still 1</div>
+        </div>
+      </div>
+
+      <div class="versus">
+        <div class="vcol">
+          <div class="vh">Temporal · DBOS · durable execution</div>
+          <p>Persist and replay the agent's <strong>state</strong> — where it was in the workflow. Priceless for resuming. But on replay they happily re-run the code that talks to the outside world.</p>
+        </div>
+        <div class="vcol b">
+          <div class="vh">safeact</div>
+          <p>Guards the <strong>action</strong> itself. It's the last inch before <span class="mono">email.send()</span> or <span class="mono">stripe.charge()</span> — a layer you drop <em>underneath</em> any of them. One file, no infra, composable.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ API ============ -->
+  <section class="block">
+    <div class="container">
+      <div class="kicker">The entire public surface</div>
+      <h2 class="sec">Four names. Grasp it in 60 seconds.</h2>
+      <div class="apiwrap">
+        <div class="code">
+          <div class="code-head"><span>the API</span><span class="badge after">tiny by design</span></div>
+<pre><span class="k">from</span> safeact <span class="k">import</span> (
+    safe,          <span class="c"># decorator: make one tool idempotent</span>
+    Saga,          <span class="c"># context mgr: steps + auto-rollback</span>
+    InDoubtError,  <span class="c"># raised on the unrecoverable gap</span>
+    SafeError,     <span class="c"># base for everything else</span>
+)
+</pre>
+        </div>
+        <div class="code">
+          <div class="code-head"><span>a saga end to end</span><span class="badge after">charge → email → log</span></div>
+<pre><span class="k">with</span> Saga(<span class="s">"refund-8842"</span>, store=<span class="s">"agent.db"</span>) <span class="k">as</span> s:
+    s.step(charge_refund, amount,
+           compensate=reverse_charge)
+    s.step(send_receipt, to,
+           compensate=send_correction)
+    s.step(write_ledger, entry)
+<span class="c"># any step raises → prior steps compensated</span>
+<span class="c"># in reverse, each exactly once.</span>
+</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div class="container foot-inner">
+      <div>safeact — at-most-once side effects for agents that crash.</div>
+      <div>Python 3.11+ · stdlib + SQLite · <a href="#fix">the fix</a> · <a href="#guarantees">guarantees</a></div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const wait = (ms)=> new Promise(r=> setTimeout(r, RM ? 0 : ms));
+
+  /* ---------- HERO twin-counter sim ---------- */
+  const naiveNum = document.getElementById('naiveNum');
+  const safeNum  = document.getElementById('safeNum');
+  const naiveSub = document.getElementById('naiveSub');
+  const safeSub  = document.getElementById('safeSub');
+  const naiveTape= document.getElementById('naiveTape');
+  const safeTape = document.getElementById('safeTape');
+  let simBusy = false;
+
+  function tapeRow(container, html){
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = html;
+    container.prepend(div);
+    while (container.children.length > 8) container.removeChild(container.lastChild);
+  }
+  function resetSim(){
+    naiveNum.textContent = '0'; safeNum.textContent = '0';
+    naiveSub.textContent = 'idle'; safeSub.textContent = 'idle';
+    naiveTape.innerHTML = ''; safeTape.innerHTML = '';
+  }
+  async function runSim(){
+    if (simBusy) return; simBusy = true;
+    resetSim();
+    let naive = 0, safe = 0;
+    const N = 40;
+    for (let i=1;i<=N;i++){
+      naive++;
+      naiveNum.textContent = naive;
+      naiveSub.textContent = 'retry #'+i+' → email.send() fired again';
+      tapeRow(naiveTape, '<span class="k">attempt '+String(i).padStart(2,'0')+'</span><span class="send">→ SENT (total '+naive+')</span>');
+
+      if (i===1){
+        safe++; safeNum.textContent = safe;
+        safeSub.textContent = 'key "welcome-42" new → executed, result stored';
+        tapeRow(safeTape, '<span class="k">attempt 01</span><span class="exec">→ EXECUTE ✓ stored SUCCEEDED</span>');
+      } else {
+        safeSub.textContent = 'key "welcome-42" seen → returned stored result';
+        tapeRow(safeTape, '<span class="k">attempt '+String(i).padStart(2,'0')+'</span><span class="dupe">→ dedup, replay stored</span>');
+      }
+      await wait(RM?0:70);
+    }
+    naiveSub.textContent = '40 duplicate emails. One angry user.';
+    safeSub.textContent = '1 email. 39 retries absorbed.';
+    simBusy = false;
+  }
+  document.getElementById('simRun').addEventListener('click', runSim);
+  document.getElementById('simReset').addEventListener('click', ()=>{ if(!simBusy) resetSim(); });
+  // gentle autoplay once, if motion allowed
+  if (!RM){
+    const io = new IntersectionObserver((es)=>{
+      es.forEach(e=>{ if(e.isIntersecting){ runSim(); io.disconnect(); }});
+    }, {threshold: 0.4});
+    io.observe(document.getElementById('sim'));
+  } else {
+    // static end-state for reduced motion
+    naiveNum.textContent='40'; naiveNum.className='num bad';
+    safeNum.textContent='1';
+    naiveSub.textContent='40 duplicate emails.'; safeSub.textContent='1 email. 39 retries absorbed.';
+  }
+
+  /* ---------- STEPPER: anatomy of one call ---------- */
+  const nodes = [...document.querySelectorAll('#track .node')];
+  const stepLog = document.getElementById('stepLog');
+  const effectCount = document.getElementById('effectCount');
+  const stepNames = ['','attempting','succeeded','indoubt','failed'];
+  let stepBusy = false, effects = 0;
+
+  function setNode(i, cls){
+    const n = nodes[i];
+    n.className = 'node on ' + cls;
+  }
+  function clearNodes(){ nodes.forEach((n,i)=> n.className = 'node' ); }
+  function logLine(t, cls, txt){
+    const d = document.createElement('div');
+    d.className = 'logline';
+    d.innerHTML = '<span class="t">'+t+'</span><span class="'+cls+'">'+txt+'</span>';
+    stepLog.appendChild(d);
+    stepLog.scrollTop = stepLog.scrollHeight;
+  }
+  function resetStep(){
+    clearNodes(); stepLog.innerHTML = '';
+    nodes[0].className = 'node on'; nodes[0].querySelector('.dot').style.borderColor='';
+  }
+  async function runStep(crash){
+    if (stepBusy) return; stepBusy = true;
+    clearNodes(); stepLog.innerHTML = '';
+    await wait(200);
+    logLine('t0','commit','BEGIN → INSERT (key, ATTEMPTING) → COMMIT');
+    setNode(1,'attempting'); await wait(650);
+    effects++; effectCount.textContent = effects;
+    logLine('t1','exec','execute side effect  ·  email.send() fires ✉');
+    setNode(2,'attempting'); await wait(650);
+    if (crash){
+      logLine('t2','crash','✗ PROCESS DIES — before the outcome is recorded');
+      await wait(500);
+      logLine('t2','miss','COMMIT (SUCCEEDED)  ·  never reached');
+      await wait(500);
+      setNode(3,'indoubt'); nodes[3].querySelector('.nm').textContent='IN_DOUBT'; nodes[3].querySelector('.dot').textContent='?';
+      logLine('t3','doubt','recovery: key is IN_DOUBT — did the email send? unknown.');
+      await wait(500);
+      logLine('t4','doubt','next call(key) → raise InDoubtError  ·  no blind retry');
+    } else {
+      logLine('t2','commit','UPDATE → SUCCEEDED, store result → COMMIT');
+      setNode(3,'succeeded'); nodes[3].querySelector('.nm').textContent='SUCCEEDED'; nodes[3].querySelector('.dot').textContent='✓';
+      await wait(400);
+      logLine('t3','commit','return stored result  ·  any future call replays it');
+    }
+    stepBusy = false;
+  }
+  document.getElementById('runNormal').addEventListener('click', ()=>runStep(false));
+  document.getElementById('runCrash').addEventListener('click', ()=>runStep(true));
+  document.getElementById('stepReset').addEventListener('click', ()=>{ if(!stepBusy){ resetStep(); }});
+  resetStep();
+
+  /* ---------- SAGA ---------- */
+  const ss = [0,1,2].map(i=> document.getElementById('ss'+i));
+  const sagaLog = document.getElementById('sagaLog');
+  let sagaBusy = false;
+  function sLog(cls, txt){
+    const d = document.createElement('div'); d.className='l '+cls; d.textContent = txt;
+    sagaLog.appendChild(d); sagaLog.scrollTop = sagaLog.scrollHeight;
+  }
+  function setState(el, txt){ el.querySelector('.state').textContent = txt; }
+  function resetSaga(){
+    ss.forEach(el=>{ el.className='sstep'; setState(el,'pending'); });
+    ss[0].querySelector('.nmn').textContent='charge_refund';
+    ss[1].querySelector('.nmn').textContent='send_receipt';
+    sagaLog.innerHTML=''; sLog('skip','Idle. Run the saga to watch it fail at step 3 and roll back.');
+  }
+  async function runSaga(){
+    if (sagaBusy) return; sagaBusy=true;
+    ss.forEach(el=>{ el.className='sstep'; setState(el,'pending'); });
+    sagaLog.innerHTML='';
+    await wait(150);
+    ss[0].classList.add('done'); setState(ss[0],'done'); sLog('exec','→ step 1  charge_refund      ✓ committed'); await wait(600);
+    ss[1].classList.add('done'); setState(ss[1],'done'); sLog('exec','→ step 2  send_receipt       ✓ committed'); await wait(600);
+    setState(ss[2],'running…'); sLog('fail','→ step 3  write_ledger       ✗ raised: ledger unreachable'); ss[2].classList.add('failed'); setState(ss[2],'failed'); await wait(750);
+    sLog('comp','⟲ rollback begins — reverse order'); await wait(500);
+    sLog('comp','⟲ compensate step 2  send_correction  ✓ (once)');
+    ss[1].className='sstep rolled'; setState(ss[1],'rolled back'); ss[1].querySelector('.nmn').textContent='send_receipt'; await wait(650);
+    sLog('comp','⟲ compensate step 1  reverse_charge   ✓ (once)');
+    ss[0].className='sstep rolled'; setState(ss[0],'rolled back'); await wait(500);
+    sLog('skip','↺ replay rollback → both compensators SUCCEEDED already → no-op. No double-refund.');
+    sagaBusy=false;
+  }
+  document.getElementById('sagaRun').addEventListener('click', runSaga);
+  document.getElementById('sagaReset').addEventListener('click', ()=>{ if(!sagaBusy) resetSaga(); });
+})();
+</script>
+
+</body>
+</html>
