@@ -29,6 +29,7 @@ safeact/  (PUBLIC · Apache-2.0)
 ├── docs/                 Marketing site (served via GitHub Pages)
 └── packages/
     ├── core-py/          SafeAct Core (Python) — exactly-once · in-doubt · saga. BUILT + tested.
+    ├── mcp-py/           SafeAct for MCP — make any MCP tool exactly-once + auditable. On PyPI: safeact-mcp.
     └── core-ts/          SafeAct Core (TypeScript SDK) — thin client. Placeholder → in progress.
 ```
 
@@ -75,15 +76,37 @@ See [packages/core-py/README.md](packages/core-py/README.md) for the full API an
 mutation-tested guarantees, and [packages/core-py/DESIGN.md](packages/core-py/DESIGN.md) for
 the state machine and rationale.
 
+## SafeAct for MCP — `pip install safeact-mcp`
+
+Building MCP tools? Two decorators make any tool exactly-once + auditable:
+
+```python
+from mcp.server.mcpserver import MCPServer
+from safeact_mcp import safe_tool
+
+server = MCPServer("payments")
+
+@server.tool()
+@safe_tool(store="agent.db")
+def charge_card(idempotency_key: str, customer: str, amount: int) -> dict:
+    stripe.charge(customer, amount)      # the real, irreversible action
+    return {"charged": amount}
+```
+
+Now `charge_card` runs at most once per key — even across agent crashes and
+retries — and every call is recorded to an audit trail. See
+[packages/mcp-py/](packages/mcp-py/).
+
 ---
 
 ## Status
 
 - **SafeAct Core (Python)** — built, mutation-tested, 15/15 green. **Live on PyPI:** `pip install safeact`.
+- **SafeAct for MCP** — **live on PyPI:** `pip install safeact-mcp`. Wraps any MCP tool.
 - **SafeAct Core (TypeScript)** — thin SDK, in progress (placeholder).
 - **SafeAct Control** — designed (see BRIEF.md §5), not yet built.
-- **Landing page** — live on GitHub Pages: https://tarunagarwal1981.github.io/safeact/
-- **Domain** — safeact.ai not yet live; links currently point at GitHub Pages.
+- **Landing page** — live at **https://safeact.dev**
+- **Domain** — safeact.dev live (GitHub Pages + HTTPS).
 
 ## Related
 
