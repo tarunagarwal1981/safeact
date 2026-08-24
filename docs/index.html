@@ -202,6 +202,12 @@
   .step-n { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .1em; }
   .step p { margin: 0; font-size: 13.5px; color: var(--ink); }
   .step .pill { align-self: flex-start; }
+  .demo-ledger { max-width: 640px; margin: 32px auto 0; }
+  #demoRows .row { padding: 14px 18px; }
+  .demo-row { opacity: 0; transform: translateY(6px); transition: opacity .45s ease, transform .45s ease; }
+  .demo-row.show { opacity: 1; transform: none; }
+  .demo-replay { display: block; margin: 20px auto 0; }
+  @media (prefers-reduced-motion: reduce){ .demo-row { opacity: 1; transform: none; transition: none; } }
 
   /* pricing / open core */
   .tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 34px; }
@@ -256,7 +262,7 @@
         <p class="sub" style="margin-top:12px;"><strong>Building MCP tools?</strong> One decorator makes any MCP tool exactly-once and auditable — no double-charges when your agent retries.</p>
         <div class="hero-actions">
           <a class="btn btn--primary" href="https://github.com/tarunagarwal1981/safeact">Get started free</a>
-          <a class="btn btn--ghost" href="#demo">Watch the 90-sec demo</a>
+          <a class="btn btn--ghost" href="#demo">Watch the live demo</a>
         </div>
         <div class="install">
           <span><span class="tick">$</span> <code>pip install safeact-mcp</code></span>
@@ -336,20 +342,19 @@
   <section id="demo">
     <div class="wrap">
       <div class="sec-head">
-        <span class="eyebrow">See it in 90 seconds</span>
-        <h2>One refund agent. Five moments. The whole thesis.</h2>
-        <p>Nothing staged — this is the product doing its job, start to finish.</p>
+        <span class="eyebrow">See it live</span>
+        <h2>It crashes. It retries. It still charges once.</h2>
+        <p>Nothing staged — the open-source core doing its job. (Hold-for-approval &amp; one-click "prove it" export arrive with SafeAct Control.)</p>
       </div>
-      <div class="demo-steps">
-        <div class="step"><span class="step-n">01</span><p>Agent issues a routine <b>$50</b> refund.</p><span class="pill pill--go">✓ CLEARED</span></div>
-        <div class="step"><span class="step-n">02</span><p>Agent tries a <b>$50,000</b> refund.</p><span class="pill pill--hold">✋ HELD</span></div>
-        <div class="step"><span class="step-n">03</span><p>A human clicks approve. It runs.</p><span class="pill pill--go">✓ RAN</span></div>
-        <div class="step"><span class="step-n">04</span><p>Server dies mid-payment, restarts.</p><span class="pill pill--go">① NO DOUBLE</span></div>
-        <div class="step"><span class="step-n">05</span><p>One button: <b>"Prove it."</b></p><span class="pill pill--seal">🔒 RECEIPT</span></div>
+      <div class="ledger demo-ledger" id="demoLedger">
+        <div class="ledger-top">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="ledger-title">action ledger</span>
+          <span class="ledger-live"><span class="beacon"></span> LIVE</span>
+        </div>
+        <div id="demoRows"></div>
       </div>
-      <div class="hero-actions" style="margin-top:28px;">
-        <a class="btn btn--primary" href="#start">Watch the demo</a>
-      </div>
+      <button class="btn btn--ghost demo-replay" id="demoReplay" type="button">&#8635; Replay</button>
     </div>
   </section>
 
@@ -407,5 +412,56 @@
     <div>safeact.dev · The control plane for AI actions · Powered by the open-source safeact, safeact-mcp + wobbly cores</div>
   </div>
 </footer>
+
+<script>
+(function () {
+  var ledger = document.getElementById('demoLedger');
+  var rowsEl = document.getElementById('demoRows');
+  if (!ledger || !rowsEl) return;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var steps = [
+    { key: 'charge_card &middot; $50.00 &rarr; alice',    meta: 'key order-42 &middot; agent tool call',        pill: '&#10003; CLEARED',  cls: 'pill--go' },
+    { key: '&#8635; agent crashed &mdash; retried',        meta: 'same key order-42',                            pill: '&#9312; NO DOUBLE', cls: 'pill--go' },
+    { key: 'charge_card &middot; $50.00 &rarr; bob',       meta: 'key order-99',                                 pill: '&#10003; CLEARED',  cls: 'pill--go' },
+    { key: '&#10007; crash mid-charge',                    meta: 'order-99 &middot; did it happen? unknown',     pill: '&#9888; IN-DOUBT',  cls: 'pill--hold' },
+    { key: '&rarr; held for a human to reconcile',         meta: 'no silent double-charge',                      pill: '&#128274; SAFE',    cls: 'pill--seal' }
+  ];
+
+  var timers = [];
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+  function build() {
+    rowsEl.innerHTML = '';
+    steps.forEach(function (s) {
+      var r = document.createElement('div');
+      r.className = 'row demo-row';
+      r.innerHTML = '<div><div class="row-key">' + s.key + '</div><div class="row-meta">' + s.meta + '</div></div>' +
+                    '<span class="pill ' + s.cls + '">' + s.pill + '</span>';
+      rowsEl.appendChild(r);
+    });
+  }
+
+  function play() {
+    clearTimers();
+    build();
+    var rows = Array.prototype.slice.call(rowsEl.children);
+    if (reduce) { rows.forEach(function (r) { r.classList.add('show'); }); return; }
+    rows.forEach(function (r, i) {
+      timers.push(setTimeout(function () { r.classList.add('show'); }, 500 + i * 1400));
+    });
+    timers.push(setTimeout(play, 500 + rows.length * 1400 + 4500)); // loop after a hold
+  }
+
+  var started = false;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting && !started) { started = true; play(); } });
+  }, { threshold: 0.3 });
+  io.observe(ledger);
+
+  var replay = document.getElementById('demoReplay');
+  if (replay) replay.addEventListener('click', play);
+})();
+</script>
 </body>
 </html>
