@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release notes — SafeAct &amp; wobbly</title>
+<style>
+  :root{
+    --ground:#0A0D12; --panel:#12161F; --hairline:#20262F; --hairline-soft:#191E27;
+    --text:#E6E9EF; --text-muted:#8A93A2; --text-faint:#5C6470;
+    --accent:#7C86FF; --st-succeeded:#46C08D; --st-attempting:#E0A63C;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    color-scheme:dark;
+  }
+  @media (prefers-color-scheme:light){
+    :root{--ground:#F6F7F9;--panel:#FFFFFF;--hairline:#E2E6EC;--hairline-soft:#EDF0F4;
+      --text:#12161F;--text-muted:#59626F;--text-faint:#99A0AC;--accent:#5560d6;
+      --st-succeeded:#1f9d67;--st-attempting:#B87914;color-scheme:light;}
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ground);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;
+    background-image:linear-gradient(var(--hairline-soft) 1px,transparent 1px);background-size:100% 3rem;background-position:0 -1px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline;text-underline-offset:3px}
+  .wrap{max-width:760px;margin:0 auto;padding:0 24px}
+
+  nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0;font-family:var(--mono);font-size:13.5px}
+  nav .home{color:var(--text-muted);display:inline-flex;align-items:center;gap:8px}
+  nav .home:hover{color:var(--text);text-decoration:none}
+  nav .mark{width:22px;height:22px;border-radius:6px;border:1px solid var(--hairline);background:var(--panel);display:grid;place-items:center}
+  nav .mark span{width:8px;height:8px;border-radius:3px;background:var(--st-succeeded);box-shadow:0 0 10px var(--st-succeeded)}
+  nav .links a{color:var(--text-muted);margin-left:18px}
+
+  header.h{padding:40px 0 10px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);margin-bottom:14px}
+  h1{font-family:var(--mono);font-size:clamp(30px,6vw,46px);letter-spacing:-.03em;font-weight:600;line-height:1.05}
+  .sub{color:var(--text-muted);margin-top:14px;max-width:60ch}
+
+  .product{margin-top:52px}
+  .product > h2{font-family:var(--mono);font-size:24px;letter-spacing:-.02em;display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--hairline)}
+  .product > h2 .dot{width:10px;height:10px;border-radius:3px}
+  .product.safeact h2 .dot{background:var(--accent)}
+  .product.wobbly h2 .dot{background:var(--st-attempting)}
+  .product > h2 small{font-family:var(--sans);font-size:13px;color:var(--text-muted);font-weight:400;margin-left:auto}
+
+  .rel{padding:22px 0;border-bottom:1px solid var(--hairline-soft)}
+  .rel:last-child{border-bottom:0}
+  .rel-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .ver{font-family:var(--mono);font-size:15px;color:var(--text);font-weight:600}
+  .ver .pkg{color:var(--text-faint);font-weight:400}
+  .pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;
+    border:1px solid var(--hairline);color:var(--text-faint)}
+  .pill.new{color:var(--st-succeeded);border-color:color-mix(in srgb,var(--st-succeeded) 40%,transparent)}
+  .rel ul{list-style:none;padding:0;margin:0}
+  .rel li{position:relative;padding-left:20px;color:var(--text-muted);font-size:14.5px;line-height:1.75}
+  .rel li::before{content:"";position:absolute;left:4px;top:11px;width:5px;height:5px;border-radius:50%;background:var(--text-faint)}
+  .rel li code{font-family:var(--mono);font-size:13px;color:var(--text);background:var(--panel);padding:1px 5px;border-radius:4px;border:1px solid var(--hairline)}
+
+  footer{margin:56px 0 70px;padding-top:24px;border-top:1px solid var(--hairline);font-family:var(--mono);font-size:12.5px;color:var(--text-faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <a class="home" href="./"><span class="mark"><span></span></span> SafeAct</a>
+    <span class="links"><a href="./">Home</a><a href="https://github.com/tarunagarwal1981/safeact">GitHub</a></span>
+  </nav>
+
+  <header class="h">
+    <div class="eyebrow">Changelog</div>
+    <h1>Release notes</h1>
+    <p class="sub">What shipped, and when. Two open-source libraries on one trust thesis — <strong>SafeAct</strong> (safe actions) and <strong>wobbly</strong> (label-free output checks).</p>
+  </header>
+
+  <!-- ================= SafeAct ================= -->
+  <section class="product safeact">
+    <h2><span class="dot"></span>SafeAct <small>safeact · safeact-mcp · safeact-langchain</small></h2>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver"><span class="pkg">safeact-langchain</span> 0.1.0</span><span class="pill new">new package</span></div>
+      <ul>
+        <li>Make any LangChain / LangGraph tool exactly-once with one decorator, keyed on the injected <code>tool_call_id</code> — hidden from the LLM schema.</li>
+        <li>Crash-safe under LangGraph: it persists tool_call_ids in its checkpoint, so a resume re-invokes with the same id and the side effect does not repeat.</li>
+        <li>Sync <em>and</em> async tools; durable audit trail + honest in-doubt.</li>
+      </ul>
+    </div>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver"><span class="pkg">safeact</span> 0.1.0 &nbsp;·&nbsp; <span class="pkg">safeact-mcp</span> 0.1.0</span><span class="pill new">feature</span></div>
+      <ul>
+        <li>Async support: <code>@safe</code> and <code>safe_tool</code> auto-detect <code>async def</code> tools and await them — same exactly-once guarantee (agent &amp; MCP tools are often async).</li>
+      </ul>
+    </div>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver"><span class="pkg">safeact-mcp</span> 0.0.1</span><span class="pill new">new package</span></div>
+      <ul>
+        <li>Make any MCP tool exactly-once and auditable in one decorator (<code>safe_tool</code>), composing under <code>MCPServer.tool()</code>.</li>
+        <li>Honest in-doubt on a mid-action crash; durable audit record per call.</li>
+      </ul>
+    </div>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver"><span class="pkg">safeact</span> 0.0.2</span><span class="pill">chore</span></div>
+      <ul>
+        <li>Packaging: repo-level Apache-2.0 <code>LICENSE</code>; fixed the PyPI homepage link.</li>
+      </ul>
+    </div>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver"><span class="pkg">safeact</span> 0.0.1</span><span class="pill">initial</span></div>
+      <ul>
+        <li>The core: <code>@safe</code> exactly-once execution, honest <code>IN_DOUBT</code> state (never a blind retry), and <code>Saga</code> compensation / rollback.</li>
+        <li>One SQLite file, no server. Mutation-tested — every guarantee has a crash-test that fails if removed.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= wobbly ================= -->
+  <section class="product wobbly">
+    <h2><span class="dot"></span>wobbly <small>metamorphic testing for AI outputs</small></h2>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver">0.4.0</span><span class="pill new">feature</span></div>
+      <ul>
+        <li><code>length_bias()</code> + <code>length_invariant()</code> — catch verbosity bias (does your judge/model prefer longer answers?) with no labels.</li>
+        <li><code>wobbly judge</code> CLI — measure position bias in your own LLM judge straight from the terminal.</li>
+      </ul>
+    </div>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver">0.3.0</span><span class="pill new">feature</span></div>
+      <ul>
+        <li><code>judge_bias()</code> — label-free position-bias measurement for an LLM-as-judge (resolves the judge's letter to the chosen answer before comparing).</li>
+        <li><code>coverage="rotate"</code> — Latin-square positional rotation so every option visits every position (random stays the default).</li>
+        <li>Opt-in real-LLM validation script for order / paraphrase relations.</li>
+      </ul>
+    </div>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver">0.2.0</span><span class="pill new">feature</span></div>
+      <ul>
+        <li>Robustness catalog: <code>order_invariant</code>, <code>distractor_robust</code>, <code>formatting_invariant</code>, <code>paraphrase_invariant</code> — each a <em>fair</em> relation a correct system can't fail.</li>
+        <li><code>equivalent()</code> assertion for free-text outputs (you inject your own embedder; baseline-spread aware).</li>
+        <li>Baseline-variance control in <code>check()</code> with per-relation violation rates; <code>assert_robust()</code> pytest/CI helper; <code>cached_system()</code> wrapper; a minimal <code>wobbly</code> CLI.</li>
+      </ul>
+    </div>
+
+    <div class="rel">
+      <div class="rel-head"><span class="ver">0.1.0</span><span class="pill">initial</span></div>
+      <ul>
+        <li>Metamorphic testing core — <code>check</code> + <code>Relation</code> + <code>Report</code>: find wrong AI outputs with no answer key.</li>
+        <li>The 535-receipt experiment (flagged outputs 2.7× more likely wrong, zero labels); <code>unchanged()</code> works on any output type; non-receipt classifier example.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>safeact.dev · <a href="./">home</a> · <a href="https://github.com/tarunagarwal1981/safeact">safeact</a> · <a href="https://github.com/tarunagarwal1981/wobbly">wobbly</a></footer>
+</div>
+</body>
+</html>
