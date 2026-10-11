@@ -23,4 +23,4 @@ from .adapter import safe_tool, audit_record, in_doubt
 from safeact import InDoubtError
 
 __all__ = ["safe_tool", "audit_record", "in_doubt", "InDoubtError"]
-__version__ = "0.0.1"
+__version__ = "0.1.0"

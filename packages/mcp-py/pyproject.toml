@@ -1,6 +1,6 @@
 [project]
 name = "safeact-mcp"
-version = "0.0.1"
+version = "0.1.0"
 description = "Make any MCP tool exactly-once and auditable — one decorator on top of the MCP SDK."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,7 +21,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "safeact>=0.0.2",
+    "safeact>=0.1.0",
     "mcp>=2.0.0",
 ]
 

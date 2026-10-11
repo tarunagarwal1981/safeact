@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import functools
 from typing import Callable, Optional
 
@@ -26,6 +27,16 @@ def safe(store, *, compensate: Optional[Callable] = None):
         send_email("welcome-42", "a@b.com", "hi")   # runs once
         send_email("welcome-42", "a@b.com", "hi")   # replays stored result
 
+    Works for `async def` tools too — `@safe` detects a coroutine function and
+    returns an awaitable wrapper with the same exactly-once guarantee:
+
+        @safe(store="agent.db")
+        async def charge(key, customer, amount):
+            await stripe.charge(customer, amount)
+            return {"ok": True}
+
+        await charge("pay-1", "alice", 50)   # runs once, awaited
+
     `compensate` registers an undo function used by Saga rollback. It is exposed as
     `.compensate` on the wrapped callable; the decorator itself does not call it.
 
@@ -35,6 +46,17 @@ def safe(store, *, compensate: Optional[Callable] = None):
     store_obj = get_store(store)
 
     def decorator(fn: Callable) -> Callable:
+        # Async tool -> awaitable wrapper that awaits the side effect via arun.
+        if asyncio.iscoroutinefunction(fn):
+            @functools.wraps(fn)
+            async def awrapper(key, *args, **kwargs):
+                return await store_obj.arun(key, fn, (key,) + args, kwargs, fn_name=fn.__name__)
+
+            awrapper.compensate = compensate  # type: ignore[attr-defined]
+            awrapper._store = store_obj       # type: ignore[attr-defined]
+            awrapper._fn = fn                 # type: ignore[attr-defined]
+            return awrapper
+
         @functools.wraps(fn)
         def wrapper(key, *args, **kwargs):
             # A required positional key: forgetting it fails loudly (store.run checks

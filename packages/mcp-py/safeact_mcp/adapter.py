@@ -6,6 +6,7 @@ It composes UNDER `MCPServer.tool()` and preserves the tool's signature (via
 
 from __future__ import annotations
 
+import asyncio
 import functools
 from typing import Any, Callable, Optional
 
@@ -31,8 +32,7 @@ def safe_tool(store, name: Optional[str] = None, key_arg: str = "idempotency_key
         tool_name = name or fn.__name__
         store_obj = get_store(store)
 
-        @functools.wraps(fn)  # keep fn's signature so MCP builds the right schema
-        def wrapper(*args, **kwargs):
+        def _key(args, kwargs):
             key = kwargs[key_arg] if key_arg in kwargs else (args[0] if args else None)
             if not isinstance(key, str) or not key:
                 raise TypeError(
@@ -40,8 +40,20 @@ def safe_tool(store, name: Optional[str] = None, key_arg: str = "idempotency_key
                     f"be a non-empty string. The MCP client should pass a stable value "
                     f"(e.g. the agent's tool-call id) so retries are deduplicated."
                 )
+            return key
+
+        # Async MCP tool -> await the side effect via the store's async path.
+        if asyncio.iscoroutinefunction(fn):
+            @functools.wraps(fn)  # keep fn's signature so MCP builds the right schema
+            async def awrapper(*args, **kwargs):
+                return await store_obj.arun(_key(args, kwargs), fn, args, kwargs, fn_name=tool_name)
+
+            return awrapper
+
+        @functools.wraps(fn)  # keep fn's signature so MCP builds the right schema
+        def wrapper(*args, **kwargs):
             # store.run executes fn(*args, **kwargs) at most once for this key.
-            return store_obj.run(key, fn, args, kwargs, fn_name=tool_name)
+            return store_obj.run(_key(args, kwargs), fn, args, kwargs, fn_name=tool_name)
 
         return wrapper
 

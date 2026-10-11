@@ -42,6 +42,20 @@ record lives in SQLite, not memory.
 
 ---
 
+## Async tools
+
+`@safe` auto-detects `async def` and awaits the side effect — same exactly-once
+guarantee (agent and MCP tools are often async):
+
+```python
+@safe(store="agent.db")
+async def charge(key, customer, amount):
+    await stripe.charge(customer, amount)
+    return {"ok": True}
+
+await charge("pay-1", "alice", 50)   # runs once, awaited
+```
+
 ## Why not just Temporal / DBOS?
 
 They persist and replay your agent's **state** — where it was in the workflow.

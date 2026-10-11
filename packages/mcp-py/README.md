@@ -37,6 +37,19 @@ That's it. Now `charge_card`:
   instead of blindly charging again. (An honest "we don't know, go check" beats a
   silent double-charge.)
 
+### Async tools
+
+`safe_tool` auto-detects `async def` tools and awaits them — same exactly-once
+guarantee (MCP servers commonly use async tools):
+
+```python
+@server.tool()
+@safe_tool(store="agent.db")
+async def charge_card(idempotency_key: str, customer: str, amount: int) -> dict:
+    await stripe.charge(customer, amount)
+    return {"charged": amount}
+```
+
 ## Reading the audit trail
 
 ```python

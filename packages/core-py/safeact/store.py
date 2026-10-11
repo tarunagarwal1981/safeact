@@ -166,6 +166,34 @@ class Store:
         self._record_succeeded(key, result)
         return result
 
+    async def arun(self, key: str, fn: Callable, args: tuple, kwargs: dict, fn_name: str | None = None) -> Any:
+        """
+        Async twin of `run`: awaits an async `fn`, with the identical exactly-once
+        contract (claim -> await side effect -> record). The durable record is
+        written synchronously (SQLite ops are fast); only the user's side effect is
+        awaited. In-doubt and ordering semantics are the same as `run`.
+        """
+        if not isinstance(key, str) or not key:
+            raise TypeError(
+                "idempotency key must be a non-empty string, supplied as the first "
+                "positional argument. Refusing to run without one."
+            )
+        ah = _args_hash(args, kwargs)
+
+        if not self._claim(key, fn_name, ah):
+            return self._resolve_existing(key)
+
+        try:
+            result = await fn(*args, **kwargs)
+        except Exception as exc:
+            self._record_failed(key, exc)
+            raise
+
+        # ---- THE GAP (same as run) ----
+        self._gap_hook(key)
+        self._record_succeeded(key, result)
+        return result
+
     def _claim(self, key: str, fn_name: str | None, args_hash: str) -> bool:
         """INSERT (key, ATTEMPTING) and COMMIT. False if the key already exists."""
         now = _now()
