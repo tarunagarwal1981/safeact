@@ -1,0 +1,40 @@
+[project]
+name = "safeact-langchain"
+version = "0.1.0"
+description = "Make a LangChain/LangGraph tool exactly-once and auditable — keyed on its tool_call_id."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Tarun Agarwal" }]
+keywords = [
+    "langchain", "langgraph", "ai-agents", "idempotency",
+    "exactly-once", "tools", "audit", "safeact", "tool-use",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "safeact>=0.1.0",
+    "langchain-core>=0.3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://safeact.dev"
+Repository = "https://github.com/tarunagarwal1981/safeact"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["safeact_langchain"]

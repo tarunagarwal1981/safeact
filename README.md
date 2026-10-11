@@ -30,6 +30,7 @@ safeact/  (PUBLIC · Apache-2.0)
 └── packages/
     ├── core-py/          SafeAct Core (Python) — exactly-once · in-doubt · saga. BUILT + tested.
     ├── mcp-py/           SafeAct for MCP — make any MCP tool exactly-once + auditable. On PyPI: safeact-mcp.
+    ├── langchain-py/     SafeAct for LangChain/LangGraph — exactly-once tools keyed on tool_call_id. On PyPI: safeact-langchain.
     └── core-ts/          SafeAct Core (TypeScript SDK) — thin client. Placeholder → in progress.
 ```
 
@@ -103,6 +104,7 @@ retries — and every call is recorded to an audit trail. See
 
 - **SafeAct Core (Python)** — built, mutation-tested, 15/15 green. **Live on PyPI:** `pip install safeact`.
 - **SafeAct for MCP** — **live on PyPI:** `pip install safeact-mcp`. Wraps any MCP tool.
+- **SafeAct for LangChain/LangGraph** — **live on PyPI:** `pip install safeact-langchain`. Exactly-once tools keyed on `tool_call_id`.
 - **SafeAct Core (TypeScript)** — thin SDK, in progress (placeholder).
 - **SafeAct Control** — designed (see BRIEF.md §5), not yet built.
 - **Landing page** — live at **https://safeact.dev**
