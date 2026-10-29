@@ -9,7 +9,7 @@ from typing import Callable, Optional
 from .store import get_store
 
 
-def safe(store, *, compensate: Optional[Callable] = None):
+def safe(store, *, compensate: Optional[Callable] = None, guard=None):
     """
     Make one tool function idempotent and durable.
 
@@ -40,17 +40,29 @@ def safe(store, *, compensate: Optional[Callable] = None):
     `compensate` registers an undo function used by Saga rollback. It is exposed as
     `.compensate` on the wrapped callable; the decorator itself does not call it.
 
-    # EXTENSION POINT: a human-approval gate would slot in here, before the store
-    # claim — mark AWAITING_APPROVAL and block until approved. Not built (DESIGN §7).
+    `guard` turns on the provenance gate (see safeact.guard). Pass a policy — or
+    `guard=True` for the default `hold_if_tainted()` — and a side-effecting call
+    whose arguments carry an untrusted origin is HELD before it runs, not executed:
+
+        from safeact.guard import taint, WEB, hold_if_tainted
+
+        @safe(store="agent.db", guard=hold_if_tainted())
+        def run_shell(key, cmd):
+            subprocess.run(cmd, shell=True)
+
+        run_shell("job-1", taint(page_text, WEB))   # raises HeldForReview, never runs
     """
     store_obj = get_store(store)
+    if guard is True:  # convenience: the default policy
+        from .guard import hold_if_tainted
+        guard = hold_if_tainted()
 
     def decorator(fn: Callable) -> Callable:
         # Async tool -> awaitable wrapper that awaits the side effect via arun.
         if asyncio.iscoroutinefunction(fn):
             @functools.wraps(fn)
             async def awrapper(key, *args, **kwargs):
-                return await store_obj.arun(key, fn, (key,) + args, kwargs, fn_name=fn.__name__)
+                return await store_obj.arun(key, fn, (key,) + args, kwargs, fn_name=fn.__name__, guard=guard)
 
             awrapper.compensate = compensate  # type: ignore[attr-defined]
             awrapper._store = store_obj       # type: ignore[attr-defined]
@@ -62,7 +74,7 @@ def safe(store, *, compensate: Optional[Callable] = None):
             # A required positional key: forgetting it fails loudly (store.run checks
             # type), never silently runs unguarded. The key is prepended to the args
             # so the underlying fn receives it as its own first parameter.
-            return store_obj.run(key, fn, (key,) + args, kwargs, fn_name=fn.__name__)
+            return store_obj.run(key, fn, (key,) + args, kwargs, fn_name=fn.__name__, guard=guard)
 
         wrapper.compensate = compensate  # type: ignore[attr-defined]
         wrapper._store = store_obj       # type: ignore[attr-defined]

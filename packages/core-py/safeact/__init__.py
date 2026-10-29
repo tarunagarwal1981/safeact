@@ -15,7 +15,8 @@ the ledger / resolving in-doubt keys).
 """
 
 from .decorator import safe
-from .errors import FailedCallError, InDoubtError, SafeError, SagaFailed
+from .errors import FailedCallError, HeldForReview, InDoubtError, SafeError, SagaFailed
+from .guard import Tainted, allow_all, hold_if, hold_if_tainted, taint
 from .saga import Saga
 from .store import Store, get_store
 
@@ -25,9 +26,16 @@ __all__ = [
     "InDoubtError",
     "SafeError",
     "FailedCallError",
+    "HeldForReview",
     "SagaFailed",
     "Store",
     "get_store",
+    # guard — provenance gate
+    "taint",
+    "Tainted",
+    "hold_if_tainted",
+    "hold_if",
+    "allow_all",
 ]
 
 __version__ = "0.1.0"

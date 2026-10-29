@@ -32,6 +32,31 @@ class InDoubtError(SafeError):
         )
 
 
+class HeldForReview(SafeError):
+    """
+    Raised when a guard policy HELD a side-effecting call instead of running it,
+    because an argument carried an untrusted provenance (web / file / tool output /
+    env). The side effect did NOT happen; a durable ``HELD`` record was written.
+
+    This is the "checked, and held when unsure" guarantee: an action an attacker
+    tried to drive through untrusted content is stopped at the boundary, with a
+    tamper-evident record of what was attempted and why. Inspect pending holds with
+    ``store.list_held()`` and close one out with ``store.release_hold(key, ...)``.
+    """
+
+    def __init__(self, record):
+        self.key = record.key
+        self.tool = record.fn_name
+        self.reason = record.error
+        self.args_hash = record.args_hash
+        self.held_at = record.created_at
+        super().__init__(
+            f"key {record.key!r} was HELD: tool {record.fn_name!r} was blocked before "
+            f"execution by a guard policy ({record.error}). The side effect did NOT happen. "
+            f"Review with store.list_held() and resolve via store.release_hold({record.key!r}, ...)."
+        )
+
+
 class FailedCallError(SafeError):
     """
     Raised on a same-key call after that key already FAILED. safeact refuses to

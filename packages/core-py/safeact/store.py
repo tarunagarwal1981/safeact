@@ -24,13 +24,15 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
-from .errors import FailedCallError, InDoubtError, SafeError
+from .errors import FailedCallError, HeldForReview, InDoubtError, SafeError
+from .guard import untaint
 
 # State constants
 ATTEMPTING = "ATTEMPTING"
 SUCCEEDED = "SUCCEEDED"
 FAILED = "FAILED"
 IN_DOUBT = "IN_DOUBT"
+HELD = "HELD"  # a guard policy blocked the action before it ran (never executed)
 
 # Sentinel stored in the `result` column when a call succeeded but its return value
 # was not JSON-serializable. We must record SUCCEEDED regardless (the side effect
@@ -128,13 +130,19 @@ class Store:
 
     # ---- the state machine -----------------------------------------------------
 
-    def run(self, key: str, fn: Callable, args: tuple, kwargs: dict, fn_name: str | None = None) -> Any:
+    def run(self, key: str, fn: Callable, args: tuple, kwargs: dict, fn_name: str | None = None, guard=None) -> Any:
         """
         Execute `fn(*args, **kwargs)` at most once for `key`, durably.
 
         Returns the (possibly replayed) result. Raises InDoubtError if the key is in
-        the unrecoverable gap, FailedCallError if the key already FAILED, or whatever
-        `fn` raised on a fresh failing attempt.
+        the unrecoverable gap, FailedCallError if the key already FAILED, HeldForReview
+        if a `guard` policy blocked the action, or whatever `fn` raised on a fresh
+        failing attempt.
+
+        `guard`, when given, is a provenance policy evaluated AFTER the key is claimed
+        and BEFORE the side effect runs (see safeact.guard). A held call never executes
+        and lands as a durable HELD record. When `guard` is None the path is identical
+        to the unguarded library — no behavior change.
         """
         if not isinstance(key, str) or not key:
             raise TypeError(
@@ -148,6 +156,16 @@ class Store:
         if not self._claim(key, fn_name, ah):
             # Someone already owns this key (prior attempt, or a concurrent caller).
             return self._resolve_existing(key)
+
+        # STEP 1.5: provenance gate. The claim is ours; decide whether this action is
+        # allowed to run given where its arguments came from. A hold flips our row to
+        # HELD and refuses — the side effect never happens.
+        if guard is not None:
+            decision = guard(key, fn_name, args, kwargs)
+            if getattr(decision, "hold", False):
+                self._mark_held(key, getattr(decision, "reason", "held by guard policy"))
+                raise HeldForReview(self.get(key))
+            args, kwargs = untaint(args), untaint(kwargs)  # hand the raw values to fn
 
         # STEP 2: run the real side effect. Only a failure HERE means FAILED.
         try:
@@ -166,12 +184,12 @@ class Store:
         self._record_succeeded(key, result)
         return result
 
-    async def arun(self, key: str, fn: Callable, args: tuple, kwargs: dict, fn_name: str | None = None) -> Any:
+    async def arun(self, key: str, fn: Callable, args: tuple, kwargs: dict, fn_name: str | None = None, guard=None) -> Any:
         """
         Async twin of `run`: awaits an async `fn`, with the identical exactly-once
-        contract (claim -> await side effect -> record). The durable record is
+        contract (claim -> gate -> await side effect -> record). The durable record is
         written synchronously (SQLite ops are fast); only the user's side effect is
-        awaited. In-doubt and ordering semantics are the same as `run`.
+        awaited. In-doubt, held, and ordering semantics are the same as `run`.
         """
         if not isinstance(key, str) or not key:
             raise TypeError(
@@ -182,6 +200,13 @@ class Store:
 
         if not self._claim(key, fn_name, ah):
             return self._resolve_existing(key)
+
+        if guard is not None:
+            decision = guard(key, fn_name, args, kwargs)
+            if getattr(decision, "hold", False):
+                self._mark_held(key, getattr(decision, "reason", "held by guard policy"))
+                raise HeldForReview(self.get(key))
+            args, kwargs = untaint(args), untaint(kwargs)
 
         try:
             result = await fn(*args, **kwargs)
@@ -226,6 +251,8 @@ class Store:
             return self._from_json(rec)  # the idempotency win: replay, do not re-run
         if rec.state == FAILED:
             raise FailedCallError(rec)   # refuse-by-default
+        if rec.state == HELD:
+            raise HeldForReview(rec)     # still blocked pending review
         if rec.state == IN_DOUBT:
             raise InDoubtError(rec)
         if rec.state == ATTEMPTING:
@@ -277,6 +304,20 @@ class Store:
         finally:
             conn.close()
 
+    def _mark_held(self, key: str, reason: str) -> None:
+        """Flip our freshly-claimed ATTEMPTING row to HELD. The side effect never ran."""
+        now = _now()
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE calls SET state=?, error=?, updated_at=? WHERE key=? AND state=?",
+                (HELD, reason, now, key, ATTEMPTING),
+            )
+            conn.execute("COMMIT")
+        finally:
+            conn.close()
+
     # ---- serialization ---------------------------------------------------------
 
     @staticmethod
@@ -323,6 +364,51 @@ class Store:
         finally:
             conn.close()
         return [Record(**dict(r)) for r in rows]
+
+    def list_held(self) -> list[Record]:
+        """Every action a guard policy blocked, oldest first — the review queue."""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT key, state, result, error, fn_name, args_hash, created_at, updated_at "
+                "FROM calls WHERE state=? ORDER BY created_at",
+                (HELD,),
+            ).fetchall()
+        finally:
+            conn.close()
+        return [Record(**dict(r)) for r in rows]
+
+    def release_hold(self, key: str, approve: bool, result: Any = None) -> None:
+        """
+        Close out a HELD action after a human has reviewed it. Mirrors `resolve` for
+        in-doubt: this records the human's decision, it does NOT re-execute anything
+        (the side effect never ran). `approve=True` -> SUCCEEDED (you assert it was
+        allowed / handled, with an optional result); `approve=False` -> FAILED (denied).
+
+        Approve-then-auto-execute (a running approval inbox) is out of scope here.
+        """
+        rec = self.get(key)
+        if rec is None:
+            raise SafeError(f"cannot release unknown key {key!r}")
+        if rec.state != HELD:
+            raise SafeError(f"key {key!r} is {rec.state}, not HELD; nothing to release")
+        now = _now()
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            if approve:
+                conn.execute(
+                    "UPDATE calls SET state=?, result=?, error=?, updated_at=? WHERE key=? AND state=?",
+                    (SUCCEEDED, self._to_json(result), "released: approved by review", now, key, HELD),
+                )
+            else:
+                conn.execute(
+                    "UPDATE calls SET state=?, error=?, updated_at=? WHERE key=? AND state=?",
+                    (FAILED, "released: denied by review", now, key, HELD),
+                )
+            conn.execute("COMMIT")
+        finally:
+            conn.close()
 
     def resolve(self, key: str, happened: bool, result: Any = None) -> None:
         """
