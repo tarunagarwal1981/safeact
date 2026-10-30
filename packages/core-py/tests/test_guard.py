@@ -202,3 +202,23 @@ def test_untaint_restores_shape():
     nested = {"a": [taint(1, WEB), 2], "b": taint("x", USER)}
     assert untaint(nested) == {"a": [1, 2], "b": "x"}
     assert not isinstance(untaint(taint("x", WEB)), Tainted)
+
+
+def test_taint_params_tags_named_args_positional_and_keyword():
+    from safeact.guard import taint_params
+
+    def tool(key, url, amount):
+        ...
+
+    def all_origins(a, k):
+        # bind_partial may normalise kwargs into positional args, so scan both
+        return origins_of(a) | origins_of(tuple(k.values()))
+
+    # positional: only `url` is tagged
+    a, k = taint_params(tool, ("job-1", "http://x", 5), {}, ["url"], WEB)
+    assert all_origins(a, k) == frozenset({WEB})
+    # keyword: same, regardless of where binding puts the value
+    a, k = taint_params(tool, ("job-1",), {"url": "http://x", "amount": 5}, ["url"], WEB)
+    assert all_origins(a, k) == frozenset({WEB})
+    # unknown name is ignored, no error
+    taint_params(tool, ("job-1", "u", 5), {}, ["nope"], WEB)

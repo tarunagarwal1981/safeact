@@ -13,8 +13,8 @@ LangGraph, tool_call_ids are persisted in the checkpoint, so a crash-and-resume
 re-invokes with the same id and the side effect does not repeat.
 """
 
-from .adapter import safe_tool, audit_record, in_doubt
-from safeact import InDoubtError
+from .adapter import safe_tool, audit_record, in_doubt, held
+from safeact import InDoubtError, HeldForReview, taint
 
-__all__ = ["safe_tool", "audit_record", "in_doubt", "InDoubtError"]
+__all__ = ["safe_tool", "audit_record", "in_doubt", "held", "InDoubtError", "HeldForReview", "taint"]
 __version__ = "0.1.0"

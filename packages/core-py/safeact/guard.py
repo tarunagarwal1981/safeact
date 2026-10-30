@@ -38,6 +38,7 @@ v0 scope — honest about the edges:
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
@@ -121,6 +122,28 @@ def untaint(x: Any, _depth: int = 0) -> Any:
     if isinstance(x, set):
         return {untaint(v, _depth + 1) for v in x}
     return x
+
+
+def taint_params(fn: Callable, args: tuple, kwargs: dict, names: Iterable[str], origin: str = UNKNOWN):
+    """
+    Return ``(args, kwargs)`` with the named parameters of ``fn`` tagged ``origin``,
+    resolving positional/keyword binding from ``fn``'s signature. Unknown names are
+    ignored. This is how an adapter auto-taints the parameters a tool author declared
+    untrusted, without the caller having to wrap each value by hand.
+    """
+    names = set(names or ())
+    if not names:
+        return args, kwargs
+    try:
+        bound = inspect.signature(fn).bind_partial(*args, **kwargs)
+    except TypeError:
+        # Signature mismatch (e.g. *args tool) — best effort: tag matching keywords.
+        kwargs = {k: (taint(v, origin) if k in names else v) for k, v in kwargs.items()}
+        return args, kwargs
+    for name in names:
+        if name in bound.arguments:
+            bound.arguments[name] = taint(bound.arguments[name], origin)
+    return tuple(bound.args), dict(bound.kwargs)
 
 
 def origins_of(x: Any, _depth: int = 0) -> frozenset:

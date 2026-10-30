@@ -16,7 +16,7 @@ the ledger / resolving in-doubt keys).
 
 from .decorator import safe
 from .errors import FailedCallError, HeldForReview, InDoubtError, SafeError, SagaFailed
-from .guard import Tainted, allow_all, hold_if, hold_if_tainted, taint
+from .guard import Tainted, allow_all, hold_if, hold_if_tainted, taint, taint_params
 from .saga import Saga
 from .store import Store, get_store
 
@@ -32,6 +32,7 @@ __all__ = [
     "get_store",
     # guard — provenance gate
     "taint",
+    "taint_params",
     "Tainted",
     "hold_if_tainted",
     "hold_if",

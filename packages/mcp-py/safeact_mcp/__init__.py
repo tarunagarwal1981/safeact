@@ -19,8 +19,8 @@ the `idempotency_key` argument — pass a stable value (e.g. your agent's
 tool-call id) so retries deduplicate.
 """
 
-from .adapter import safe_tool, audit_record, in_doubt
-from safeact import InDoubtError
+from .adapter import safe_tool, audit_record, in_doubt, held
+from safeact import InDoubtError, HeldForReview, taint
 
-__all__ = ["safe_tool", "audit_record", "in_doubt", "InDoubtError"]
+__all__ = ["safe_tool", "audit_record", "in_doubt", "held", "InDoubtError", "HeldForReview", "taint"]
 __version__ = "0.1.0"

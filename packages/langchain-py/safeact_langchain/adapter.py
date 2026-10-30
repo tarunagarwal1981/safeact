@@ -15,12 +15,21 @@ from typing import Annotated, Callable, Optional
 
 from langchain_core.tools import InjectedToolCallId, StructuredTool
 
-from safeact import get_store, InDoubtError  # re-exported for callers
+from safeact import get_store, HeldForReview, InDoubtError  # re-exported for callers
+from safeact.guard import UNKNOWN, hold_if_tainted, taint_params
 
 _KEY_PARAM = "safeact_tool_call_id"
 
 
-def safe_tool(store, *, name: Optional[str] = None, description: Optional[str] = None) -> Callable:
+def safe_tool(
+    store,
+    *,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    guard=None,
+    untrusted=None,
+    untrusted_origin: str = UNKNOWN,
+) -> Callable:
     """Turn a function into a LangChain `StructuredTool` that runs **at most once
     per tool-call**, keyed on the injected `tool_call_id`.
 
@@ -34,8 +43,19 @@ def safe_tool(store, *, name: Optional[str] = None, description: Optional[str] =
     The LLM never sees an idempotency key — it's LangChain's own tool-call id. Bind
     the returned tool to your agent / LangGraph `ToolNode` as usual. Works for
     `async def` tools too. Every call is recorded to `store` (the audit trail).
+
+    Provenance gate (safeact.guard): pass ``untrusted=["url", "document"]`` to name
+    the parameters an attacker can drive; a value arriving in them is auto-tainted
+    and HELD before the side effect runs (``HeldForReview``, recorded durably).
+    ``guard`` may instead/also be a policy (or ``True`` for the default); naming
+    ``untrusted`` params turns the default policy on for you.
     """
     store_obj = get_store(store)
+    if guard is True:
+        guard = hold_if_tainted()
+    untrusted = list(untrusted or [])
+    if untrusted and guard is None:
+        guard = hold_if_tainted()
 
     def decorator(fn: Callable) -> StructuredTool:
         tool_name = name or fn.__name__
@@ -62,10 +82,16 @@ def safe_tool(store, *, name: Optional[str] = None, description: Optional[str] =
                 )
             return key
 
+        def _taint(args, kwargs):
+            if not untrusted:
+                return args, kwargs
+            return taint_params(fn, args, kwargs, untrusted, untrusted_origin)
+
         if asyncio.iscoroutinefunction(fn):
             async def awrapper(*args, **kwargs):
                 key = _key(kwargs)
-                return await store_obj.arun(key, fn, args, kwargs, fn_name=tool_name)
+                targs, tkwargs = _taint(args, kwargs)
+                return await store_obj.arun(key, fn, targs, tkwargs, fn_name=tool_name, guard=guard)
 
             functools.update_wrapper(awrapper, fn)
             awrapper.__signature__ = new_sig          # type: ignore[attr-defined]
@@ -74,7 +100,8 @@ def safe_tool(store, *, name: Optional[str] = None, description: Optional[str] =
 
         def wrapper(*args, **kwargs):
             key = _key(kwargs)
-            return store_obj.run(key, fn, args, kwargs, fn_name=tool_name)
+            targs, tkwargs = _taint(args, kwargs)
+            return store_obj.run(key, fn, targs, tkwargs, fn_name=tool_name, guard=guard)
 
         functools.update_wrapper(wrapper, fn)
         wrapper.__signature__ = new_sig               # type: ignore[attr-defined]
@@ -92,3 +119,8 @@ def audit_record(store, key: str):
 def in_doubt(store):
     """Tool-call ids stuck in the unrecoverable gap — the human-review queue."""
     return get_store(store).list_in_doubt()
+
+
+def held(store):
+    """Tool calls a guard policy blocked before execution — the review queue."""
+    return get_store(store).list_held()

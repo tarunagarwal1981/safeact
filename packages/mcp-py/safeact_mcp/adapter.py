@@ -10,10 +10,19 @@ import asyncio
 import functools
 from typing import Any, Callable, Optional
 
-from safeact import get_store, InDoubtError  # re-exported for callers
+from safeact import get_store, HeldForReview, InDoubtError  # re-exported for callers
+from safeact.guard import UNKNOWN, hold_if_tainted, taint_params
 
 
-def safe_tool(store, name: Optional[str] = None, key_arg: str = "idempotency_key") -> Callable:
+def safe_tool(
+    store,
+    name: Optional[str] = None,
+    key_arg: str = "idempotency_key",
+    *,
+    guard=None,
+    untrusted=None,
+    untrusted_origin: str = UNKNOWN,
+) -> Callable:
     """Wrap an MCP tool so it runs at most once per idempotency key.
 
     The wrapped tool must accept `key_arg` (default ``idempotency_key``) as a
@@ -25,12 +34,30 @@ def safe_tool(store, name: Optional[str] = None, key_arg: str = "idempotency_key
     Every attempt is persisted to `store` — that durable record IS the audit
     trail (read it with ``audit_record`` / list the review queue with ``in_doubt``).
 
+    Provenance gate (safeact.guard): pass ``untrusted=["url", "document"]`` to name
+    the parameters an attacker can drive (free text, fetched content, a filename),
+    and any value arriving in them is auto-tainted and HELD before the side effect
+    runs — raising ``HeldForReview``, recorded durably. ``guard`` may instead/also be
+    a full policy (or ``True`` for the default); naming ``untrusted`` params turns the
+    default policy on for you.
+
     # EXTENSION POINT: derive the key from MCP request `_meta` via a Context param,
     # so well-behaved clients don't have to expose it in the tool schema. Not built.
     """
+    if guard is True:
+        guard = hold_if_tainted()
+    untrusted = list(untrusted or [])
+    if untrusted and guard is None:
+        guard = hold_if_tainted()
+
     def decorator(fn: Callable) -> Callable:
         tool_name = name or fn.__name__
         store_obj = get_store(store)
+
+        def _taint(args, kwargs):
+            if not untrusted:
+                return args, kwargs
+            return taint_params(fn, args, kwargs, untrusted, untrusted_origin)
 
         def _key(args, kwargs):
             key = kwargs[key_arg] if key_arg in kwargs else (args[0] if args else None)
@@ -46,14 +73,18 @@ def safe_tool(store, name: Optional[str] = None, key_arg: str = "idempotency_key
         if asyncio.iscoroutinefunction(fn):
             @functools.wraps(fn)  # keep fn's signature so MCP builds the right schema
             async def awrapper(*args, **kwargs):
-                return await store_obj.arun(_key(args, kwargs), fn, args, kwargs, fn_name=tool_name)
+                key = _key(args, kwargs)
+                targs, tkwargs = _taint(args, kwargs)
+                return await store_obj.arun(key, fn, targs, tkwargs, fn_name=tool_name, guard=guard)
 
             return awrapper
 
         @functools.wraps(fn)  # keep fn's signature so MCP builds the right schema
         def wrapper(*args, **kwargs):
             # store.run executes fn(*args, **kwargs) at most once for this key.
-            return store_obj.run(_key(args, kwargs), fn, args, kwargs, fn_name=tool_name)
+            key = _key(args, kwargs)
+            targs, tkwargs = _taint(args, kwargs)
+            return store_obj.run(key, fn, targs, tkwargs, fn_name=tool_name, guard=guard)
 
         return wrapper
 
@@ -68,3 +99,8 @@ def audit_record(store, key: str):
 def in_doubt(store):
     """Keys stuck in the unrecoverable gap — the human-review queue."""
     return get_store(store).list_in_doubt()
+
+
+def held(store):
+    """Tool calls a guard policy blocked before execution — the review queue."""
+    return get_store(store).list_held()
