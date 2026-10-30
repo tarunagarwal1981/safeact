@@ -56,6 +56,33 @@ async def charge(key, customer, amount):
 await charge("pay-1", "alice", 50)   # runs once, awaited
 ```
 
+## Guard: block actions driven by untrusted data (`safeact.guard`)
+
+Exactly-once answers *"did it happen once?"*. Guard answers *"should it have happened
+at all?"* — the question the 2026 agent breaches turned on, where untrusted content (a
+planted `AGENTS.md`, a web page, a tool's output) became instructions that reached a
+real action. Tag where a value came from, and a side-effecting call that receives an
+**untrusted** argument is HELD before it runs — never executed, recorded durably:
+
+```python
+from safeact import safe, taint
+from safeact.guard import WEB, hold_if_tainted
+
+@safe(store="agent.db", guard=hold_if_tainted())
+def run_shell(key, cmd):
+    subprocess.run(cmd, shell=True)
+
+run_shell("job-1", taint(page_text, WEB))   # HeldForReview — never runs
+run_shell("job-2", "ls")                     # untagged/trusted — runs
+
+store.list_held()                 # the review queue
+store.release_hold("job-1", approve=False)   # resolve after a human looks
+```
+
+Provenance, not pattern-matching: it gates on *origin*, so it catches what
+prompt-injection classifiers miss. See [GUARD.md](GUARD.md) for the threat model and
+the honest v0 edges.
+
 ## Why not just Temporal / DBOS?
 
 They persist and replay your agent's **state** — where it was in the workflow.

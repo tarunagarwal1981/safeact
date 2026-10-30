@@ -98,11 +98,40 @@ Now `charge_card` runs at most once per key — even across agent crashes and
 retries — and every call is recorded to an audit trail. See
 [packages/mcp-py/](packages/mcp-py/).
 
+## Guard — block actions driven by untrusted data
+
+The 2026 agent breaches (planted `AGENTS.md`, Agentforce form exfiltration) share one
+shape: untrusted content an agent *reads* becomes instructions that reach a real
+action, with nothing checking where the data came from. SafeAct Guard is a
+**provenance gate**: tag a value's origin, and a side-effecting call that receives an
+untrusted argument is **held before it runs** — never executed, recorded durably.
+
+```python
+from safeact import safe, taint
+from safeact.guard import WEB, hold_if_tainted
+
+@safe(store="agent.db", guard=hold_if_tainted())
+def run_shell(key, cmd):
+    subprocess.run(cmd, shell=True)
+
+run_shell("job-1", taint(page_text, WEB))   # HeldForReview — never runs
+```
+
+Same gate at the tool boundary — name the attacker-reachable params:
+
+```python
+@safe_tool(store="agent.db", untrusted=["document", "url"])   # MCP or LangChain
+def summarize(idempotency_key, document): ...
+```
+
+See [packages/core-py/GUARD.md](packages/core-py/GUARD.md) for the threat model.
+
 ---
 
 ## Status
 
-- **SafeAct Core (Python)** — built, mutation-tested, 15/15 green. **Live on PyPI:** `pip install safeact`.
+- **SafeAct Core (Python)** — built, mutation-tested, 34/34 green. **Live on PyPI:** `pip install safeact`.
+- **SafeAct Guard** — provenance gate (`safeact.guard`): hold side-effecting calls driven by untrusted data. In the core package; also at the MCP / LangChain tool boundary. See [GUARD.md](packages/core-py/GUARD.md).
 - **SafeAct for MCP** — **live on PyPI:** `pip install safeact-mcp`. Wraps any MCP tool.
 - **SafeAct for LangChain/LangGraph** — **live on PyPI:** `pip install safeact-langchain`. Exactly-once tools keyed on `tool_call_id`.
 - **SafeAct Core (TypeScript)** — thin SDK, in progress (placeholder).
